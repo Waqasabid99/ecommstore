@@ -6,16 +6,22 @@ import LimitedTimeOffer from "@/components/HomePage/LimitedTimeOffer";
 import PartnersSlider from "@/components/HomePage/OurPartners";
 import OurSpecialties from "@/components/HomePage/OurSpecialties";
 import PageTransition from "@/components/Transitions/PageTransition";
+import { getCategories } from "../api/category";
+import { getProducts } from "../api/product";
 
-export default function Home() {
+export default async function Home() {
+  const fetchedProducts = getProducts();
+  const fetchedCategories = getCategories();
+  const products = fetchedProducts.data;
+  const categories = fetchedCategories.data;
   return (
     <>
       <PageTransition>
         <Hero />
         <OurSpecialties />
-        <Categories />
+        <Categories categories={categories} />
         <HomeSectionAbout />
-        <Catalog />
+        <Catalog products={products} />
         <LimitedTimeOffer />
         <PartnersSlider />
       </PageTransition>

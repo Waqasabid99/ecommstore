@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Search,
   ShoppingCart,
@@ -25,10 +25,14 @@ const Navbar = () => {
   const [openProfileDropDown, setOpenProfileDropDown] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const { logout } = useAuthStore();
-  const { isAuthenticated, user } = useAuth();
+  const { logout, checkAuth } = useAuthStore();
+  const { isAuthenticated, user, } = useAuth();
+  console.log(isAuthenticated)
   const navigate = useRouter();
   const pathname = usePathname();
+  useEffect(() => {
+    checkAuth();
+  }, [])
   // Sample cart items
   const cartItems = [
     { id: 1, title: "Wireless Headphones", quantity: 2, price: 2999 },

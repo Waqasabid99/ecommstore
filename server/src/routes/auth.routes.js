@@ -1,6 +1,7 @@
 import express from "express";
 import { verifyUser } from "../middleware/auth.middleware.js";
 import { createNewPassword, forgotPassword, loginUser, logoutUser, refreshAccessToken, registerUser, resetPassword } from "../controllers/auth.controller.js";
+import { safeUser } from "../constants/constants.js";
 const authRouter = express.Router();
 
 // Register user

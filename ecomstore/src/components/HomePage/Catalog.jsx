@@ -4,7 +4,7 @@ import { categories } from "@/constants/utils";
 import Products from "./Products";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-const Catalog = () => {
+const Catalog = ({ products }) => {
   const categoryRef = useRef(null);
 
   const handleScroll = (direction) => {
@@ -88,7 +88,7 @@ const Catalog = () => {
         </div>
       </div>
 
-      <Products />
+      <Products products={products}/>
     </section>
   );
 };

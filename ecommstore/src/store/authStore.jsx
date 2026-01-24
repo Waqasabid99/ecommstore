@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import api from "@/components/ui/axios";
+import useCartStore from "./useCartStore";
 
 const useAuthStore = create(
   persist(
@@ -30,13 +31,22 @@ const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const { data } = await api.post("/auth/login", formData);
-          set({ user: data.user, isLoading: false });
+          console.log(data)
+          if (data.success ) {
+            const { user } = data;
+            set({ user, isAuthenticated: true });
+          }
+
+          const cartStore = useCartStore.getState();
+          await cartStore.mergeGuestCart();
+          await cartStore.initializeCart();
           return { success: true };
         } catch (err) {
           set({
             error: err.response?.data?.message || "Login failed",
             isLoading: false,
           });
+          console.log(err);
           return { success: false };
         }
       },
@@ -48,6 +58,7 @@ const useAuthStore = create(
           await api.post("/auth/logout");
         } finally {
           get().forceLogout();
+          useCartStore.getState().resetCart();
         }
       },
 

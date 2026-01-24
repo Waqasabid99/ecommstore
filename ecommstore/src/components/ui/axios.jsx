@@ -1,10 +1,14 @@
 import axios from "axios";
 import useAuthStore from "@/store/authStore";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 const api = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+});
+
+const refreshApi = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
 });
@@ -14,7 +18,7 @@ let isRefreshing = false;
 let failedQueue = [];
 
 const processQueue = (error = null) => {
-  failedQueue.forEach(promise => {
+  failedQueue.forEach((promise) => {
     if (error) promise.reject(error);
     else promise.resolve();
   });
@@ -23,14 +27,11 @@ const processQueue = (error = null) => {
 
 // RESPONSE INTERCEPTOR
 api.interceptors.response.use(
-  res => res,
-  async error => {
+  (res) => res,
+  async (error) => {
     const originalRequest = error.config;
 
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry
-    ) {
+    if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -41,7 +42,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await api.post("/auth/refresh-token");
+        await refreshApi.post("/auth/refresh-token");
         processQueue();
         return api(originalRequest);
       } catch (err) {
@@ -54,7 +55,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

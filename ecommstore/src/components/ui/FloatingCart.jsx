@@ -2,48 +2,26 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react';
+import useCartStore from '@/store/useCartStore';
+import { useRouter } from 'next/navigation';
 
 const FloatingCart = () => {
+  const { getCartItems, getCartSummary, updateCartItem, removeCartItem } = useCartStore();
+  const { totalQuantity, subtotal } = getCartSummary();
+  const cartItems = getCartItems();
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      name: 'Premium Wireless Headphones',
-      price: 299.99,
-      quantity: 1,
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop'
-    },
-    {
-      id: 2,
-      name: 'Smart Watch Series 5',
-      price: 399.99,
-      quantity: 2,
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop'
-    },
-    {
-      id: 3,
-      name: 'Leather Wallet',
-      price: 89.99,
-      quantity: 1,
-      image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=300&h=300&fit=crop'
-    }
-  ]);
+  
+  const router = useRouter();
 
-  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-  const updateQuantity = (id, delta) => {
-    setCartItems(items =>
-      items.map(item =>
-        item.id === id
-          ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-          : item
-      ).filter(item => item.quantity > 0)
-    );
+  const updateQuantity = (itemId, currentQty, delta) => {
+    const newQty = currentQty + delta;
+    if (newQty < 1 || newQty > 99) return;
+    updateCartItem(itemId, newQty);
   };
 
-  const removeItem = (id) => {
-    setCartItems(items => items.filter(item => item.id !== id));
+
+  const removeItem = (itemId) => {
+    removeCartItem(itemId);
   };
 
   return (
@@ -64,7 +42,7 @@ const FloatingCart = () => {
       >
         <div className="relative">
           <ShoppingCart size={24} />
-          {totalItems > 0 && (
+          {totalQuantity > 0 && (
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -74,7 +52,7 @@ const FloatingCart = () => {
                 color: 'var(--color-white)'
               }}
             >
-              {totalItems}
+              {totalQuantity}
             </motion.span>
           )}
         </div>
@@ -117,7 +95,7 @@ const FloatingCart = () => {
                   Shopping Cart
                 </h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                  {totalQuantity} {totalQuantity === 1 ? 'item' : 'items'}
                 </p>
               </div>
               <button
@@ -162,19 +140,19 @@ const FloatingCart = () => {
                         {item.name}
                       </h3>
                       <p className="text-lg font-bold mb-2" style={{ color: 'var(--color-brand-primary)' }}>
-                        ${item.price.toFixed(2)}
+                        ${item.price}
                       </p>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 border rounded-lg" style={{ borderColor: 'var(--border-default)' }}>
                           <button
-                            onClick={() => updateQuantity(item.id, -1)}
+                            onClick={() => updateQuantity(item, item.quantity, -1)}
                             className="p-1 hover:bg-gray-100 rounded-l-lg transition-colors"
                           >
                             <Minus size={16} />
                           </button>
                           <span className="px-3 font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.id, 1)}
+                            onClick={() => updateQuantity(item.id, item.quantity, 1)}
                             className="p-1 hover:bg-gray-100 rounded-r-lg transition-colors"
                           >
                             <Plus size={16} />
@@ -207,13 +185,14 @@ const FloatingCart = () => {
                     Subtotal
                   </span>
                   <span className="text-2xl font-bold" style={{ color: 'var(--text-heading)' }}>
-                    ${totalPrice.toFixed(2)}
+                    ${subtotal}
                   </span>
                 </div>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Shipping and taxes calculated at checkout
                 </p>
                 <button
+                  onClick={() => router.push("/checkout")}
                   className="w-full py-4 rounded-lg font-semibold text-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]"
                   style={{
                     backgroundColor: 'var(--btn-bg-primary)',

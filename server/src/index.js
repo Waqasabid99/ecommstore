@@ -8,6 +8,10 @@ import userRouter from "./routes/user.routes.js";
 import productRouter from "./routes/product.route.js";
 import seedRouter from "./routes/seeder.route.js";
 import categoryRouter from "./routes/category.routes.js";
+import cartRouter from "./routes/cart.routes.js";
+import checkoutRouter from "./routes/checkout.routes.js";
+import orderRouter from "./routes/order.routes.js";
+import couponRouter from "./routes/coupon.routes.js";
 const app = express();
 const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
 
@@ -27,12 +31,16 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get("/", (req, res) => {
-    res.send("Hello from the backend!");
+    res.send("Backend is running");
 });
 app.use("/auth", authRouter);
 app.use("/users", userRouter);
 app.use("/products", productRouter);
 app.use("/categories", categoryRouter);
+app.use("/cart", cartRouter);
+app.use("/coupons", couponRouter);
+app.use("/checkout", checkoutRouter);
+app.use("/orders", orderRouter);
 app.use("/seed", seedRouter);
 
 app.listen(port, () => {

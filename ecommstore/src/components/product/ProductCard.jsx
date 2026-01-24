@@ -2,9 +2,18 @@ import { Heart } from "lucide-react";
 import RatingStars from "@/components/ui/ProductRating";
 import Link from "next/link";
 import { baseUrl } from "@/lib/utils";
+import useCartStore from "@/store/useCartStore";
 
 const ProductCard = ({ product }) => {
-  console.log(product.length);
+  const { addToCart } = useCartStore();
+  const handleAddToCart = async  () => {
+    await addToCart({
+      productId: product.id,
+      variantId: product.variants?.[0]?.id,
+      quantity: 1,
+      product,
+    });
+  }
   // Get Thumbnail OR fallback
   const mainImage =
     product.images?.find(img => img.isMain)?.url ||
@@ -42,6 +51,7 @@ const ProductCard = ({ product }) => {
 
         {/* Hover Add to Cart (Desktop) */}
         <button
+        onClick={handleAddToCart}
           className="absolute opacity-0 group-hover:opacity-100
                      transition-all bg-(--btn-bg-primary)
                      text-(--btn-text-primary)
@@ -79,6 +89,7 @@ const ProductCard = ({ product }) => {
 
         {/* Mobile Add to Cart */}
         <button
+          onClick={handleAddToCart}
           className="mt-2 block lg:hidden bg-(--btn-bg-primary)
                      text-(--btn-text-primary)
                      rounded-full px-4 py-1"

@@ -40,15 +40,15 @@ const SingleProductPage = ({ products }) => {
               {/* Main Image */}
               <div className="border border-(--border-default) rounded-xl overflow-hidden bg-(--bg-surface) aspect-square flex items-center justify-center">
                 <img
-                  src={`${baseUrl}${selectedImage ? product.images.find(img => img.id === selectedImage).url : isMain.url}`}
-                  alt={product.images[0].alt}
+                  src={`${product.images.length > 0 ? `${baseUrl}${selectedImage ? product.images.find(img => img.id === selectedImage).url : isMain.url}` : '/placeholder.png'} `}
+                  alt={product.images.length > 0 ? `Product ${selectedImage ? selectedImage + 1 : isMain.id + 1}` : 'Product'}
                   className="w-full h-full object-cover"
                 />
               </div>
 
               {/* Thumbnail Images */}
               <div className="grid grid-cols-4 gap-3">
-                {product.images.map((img) => (
+                {product.images?.map((img) => (
                   <button
                     key={img.id}
                     onClick={() => setSelectedImage(img.id)}

@@ -54,53 +54,95 @@ const getAllProducts = async (req, res) => {
 
 // Get product by ID
 const getProductById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const product = await prisma.product.findUnique({
-            where: { id: id, deletedAt: null }
-        });
-        if (!product) {
-            return res.status(404).json({ success: false, error: "Product not found" });
-        }
-        res.status(200).json({ success: true, data: product });
-    } catch (error) {
-        res.status(500).json({ success: false, error: "Internal Server Error" });
+  try {
+    const { id } = req.params;
+
+    const product = await prisma.product.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
+      include: {
+        images: true,
+        variants: {
+          where: { deletedAt: null },
+          include: {
+            inventory: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: "Product not found",
+      });
     }
-}
+
+    res.status(200).json({
+      success: true,
+      data: product,
+    });
+  } catch (error) {
+    console.error("Get product error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
+};
 
 // Create product
 const createProduct = async (req, res) => {
-  const { name, description, price, quantity, categoryId, isActive = true, variants } = req.body;
-  const thumbnailFile = req.files?.thumbnail?.[0];
+  const {
+    name,
+    description,
+    price,
+    categoryId,
+    isActive = true,
+    variants,
+  } = req.body;
+
+  const thumbnailFile = req.files?.thumbnail?.[0] || null;
   const secondaryImages = req.files?.images || [];
 
-  // Basic validation
-  if (!name || !price || !categoryId || !quantity) {
-    return res.status(400).json({ success: false, error: "Missing required fields" });
+  if (!name || !price || !categoryId) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields",
+    });
   }
 
   let parsedVariants = [];
+
+  // Variants are OPTIONAL
   if (variants) {
     try {
       parsedVariants = JSON.parse(variants);
       if (!Array.isArray(parsedVariants)) {
-        throw new Error("Variants must be an array");
+        throw new Error();
       }
-    } catch (err) {
+    } catch {
       return res.status(400).json({
         success: false,
-        error: "Invalid variants format",
+        message: "Invalid variants format",
       });
     }
   }
 
+  const hasVariants = parsedVariants.length > 0;
   const slug = slugify(name, { lower: true, strict: true });
-  const uploadedFiles = [thumbnailFile, ...secondaryImages];
+
+  const uploadedFiles = [thumbnailFile, ...secondaryImages].filter(Boolean);
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Check category existence
-      const category = await tx.category.findUnique({ where: { id: categoryId } });
+      // Validate category
+      const category = await tx.category.findUnique({
+        where: { id: categoryId },
+      });
+
       if (!category) {
         throw new Error("Category not found");
       }
@@ -112,22 +154,16 @@ const createProduct = async (req, res) => {
           slug,
           description,
           price: parseFloat(price),
-          quantity: parseInt(quantity),
           isActive,
           categoryId,
+          hasVariants,
         },
       });
-      await tx.inventory.create({
-        data: {
-            productId: product.id,
-            quantity: parseInt(quantity),
-        }
-      })
 
       const createdVariants = [];
 
-      // Only create variants if provided
-      if (parsedVariants.length > 0) {
+      // Create variants (only if present)
+      if (hasVariants) {
         for (const variant of parsedVariants) {
           const createdVariant = await tx.productVariant.create({
             data: {
@@ -140,7 +176,7 @@ const createProduct = async (req, res) => {
 
           await tx.inventory.create({
             data: {
-              variantId: createdVariant.id,
+              variantId: createdVariant.id, // ✅ FIXED
               quantity: variant.quantity ?? 0,
             },
           });
@@ -149,25 +185,21 @@ const createProduct = async (req, res) => {
         }
       }
 
-      // Handle images
-      const imagesData = [
-        ...(thumbnailFile
-          ? [
-              {
-                productId: product.id,
-                url: `/uploads/products/${thumbnailFile.filename}`,
-                isMain: true,
-              },
-            ]
-          : []),
-        ...secondaryImages.map((img) => ({
-          productId: product.id,
-          url: `/uploads/products/${img.filename}`,
-          isMain: false,
-        })),
-      ];
+      // Images (optional)
+      if (thumbnailFile || secondaryImages.length) {
+        const imagesData = [
+          thumbnailFile && {
+            productId: product.id,
+            url: `/uploads/products/${thumbnailFile.filename}`,
+            isMain: true,
+          },
+          ...secondaryImages.map((img) => ({
+            productId: product.id,
+            url: `/uploads/products/${img.filename}`,
+            isMain: false,
+          })),
+        ].filter(Boolean);
 
-      if (imagesData.length > 0) {
         await tx.productImage.createMany({ data: imagesData });
       }
 
@@ -181,32 +213,37 @@ const createProduct = async (req, res) => {
             name,
             slug,
             categoryId,
-            price,
-            quantity: parseInt(quantity),
+            hasVariants,
             variantsCount: createdVariants.length,
           },
-        //   userId: req.user.id,
-          ipAddress: req.ip,
-          userAgent: req.headers["user-agent"],
         },
       });
 
       return { product, variants: createdVariants };
     });
 
-    res.status(201).json({ success: true, data: result, message: "Product created successfully" });
+    return res.status(201).json({
+      success: true,
+      message: "Product created successfully",
+      data: result,
+    });
   } catch (error) {
-    // Cleanup uploaded files if transaction fails
     uploadedFiles.forEach((file) => {
-      if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      file?.path && fs.existsSync(file.path) && fs.unlinkSync(file.path);
     });
 
     if (error.code === "P2002") {
-      return res.status(409).json({ success: false, error: "Product with this name already exists" });
+      return res.status(409).json({
+        success: false,
+        message: "Product with this name already exists",
+      });
     }
 
     console.error(error);
-    res.status(500).json({ success: false, error: "Internal Server Error" });
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
   }
 };
     

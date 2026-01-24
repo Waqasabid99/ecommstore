@@ -103,8 +103,8 @@ const loginUser = async (req, res) => {
             success: false,
             message: "Internal server error",
             error: error,
-            console: console.log(error),
         });
+        console.log(error)
     }
 };
 

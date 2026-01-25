@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react';
 import useCartStore from '@/store/useCartStore';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const FloatingCart = () => {
   const { getCartItems, getCartSummary, updateCartItem, removeCartItem } = useCartStore();
@@ -117,7 +118,7 @@ const FloatingCart = () => {
                   </p>
                 </div>
               ) : (
-                cartItems.map((item) => (
+                cartItems?.map((item) => (
                   <motion.div
                     key={item.id}
                     layout
@@ -136,9 +137,11 @@ const FloatingCart = () => {
                       className="w-20 h-20 object-cover rounded-lg"
                     />
                     <div className="flex-1">
+                      <Link href={`/shop/products/${item.slug}`} >
                       <h3 className="font-semibold mb-1" style={{ color: 'var(--text-heading)' }}>
                         {item.name}
                       </h3>
+                      </Link>
                       <p className="text-lg font-bold mb-2" style={{ color: 'var(--color-brand-primary)' }}>
                         ${item.price}
                       </p>

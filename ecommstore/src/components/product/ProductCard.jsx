@@ -1,19 +1,30 @@
+"use client";
 import { Heart } from "lucide-react";
 import RatingStars from "@/components/ui/ProductRating";
 import Link from "next/link";
 import { baseUrl } from "@/lib/utils";
 import useCartStore from "@/store/useCartStore";
+import Loader from "../ui/Loader";
+import { useState } from "react";
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCartStore();
-  const handleAddToCart = async  () => {
-    await addToCart({
-      productId: product.id,
-      variantId: product.variants?.[0]?.id,
-      quantity: 1,
-      product,
-    });
-  }
+  const [isLoading, setIsLoading] = useState(false);
+ const handleAddToCart = async () => {
+    if (isLoading) return;
+
+    try {
+      setIsLoading(true);
+      await addToCart({
+        productId: product.id,
+        variantId: product.variants?.[0]?.id,
+        quantity: 1,
+        product,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Get Thumbnail OR fallback
   const mainImage =
     product.images?.find(img => img.isMain)?.url ||
@@ -57,7 +68,7 @@ const ProductCard = ({ product }) => {
                      text-(--btn-text-primary)
                      rounded-full px-4 py-1"
         >
-          Add to Cart
+          {isLoading ? <Loader text={"Adding..."} size="lg"/> : "Add to Cart"}
         </button>
       </div>
 
@@ -94,7 +105,7 @@ const ProductCard = ({ product }) => {
                      text-(--btn-text-primary)
                      rounded-full px-4 py-1"
         >
-          Add to Cart
+        {isLoading ? <Loader text={"Adding..."} size="sm"/> : "Add to Cart"}
         </button>
       </div>
     </div>

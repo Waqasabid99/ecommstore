@@ -21,8 +21,9 @@ import useAuth from "@/hooks/useAuth";
 import useAuthStore from "@/store/authStore";
 import { getCategories } from "@/lib/api/category";
 import useCartStore from "@/store/useCartStore";
+import { getProducts } from "@/lib/api/product";
 
-const Navbar = () => {
+const Navbar = ({ products }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openProfileDropDown, setOpenProfileDropDown] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -32,10 +33,12 @@ const Navbar = () => {
   const { isAuthenticated, user, } = useAuth();
 
   const { getCartItems, getCartSummary } = useCartStore();
+  const cart = useCartStore((state) => state.cart);
+  console.log(cart);
   const { itemCount, subtotal } = getCartSummary();
 
   const cartItems = getCartItems();
-
+  console.log(cartItems)
   const navigate = useRouter();
   const pathname = usePathname();
   useEffect(() => {
@@ -225,6 +228,7 @@ const Navbar = () => {
                             key={item.id}
                             className="px-4 py-3 border-b border-(--border-default) hover:bg-gray-50 transition-colors"
                           >
+                            <Link href={`/shop/products/${item.slug}`}>
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <h4 className="font-medium text-sm text-(--text-primary)">
@@ -238,6 +242,7 @@ const Navbar = () => {
                                 ×{item.quantity}
                               </span>
                             </div>
+                            </Link>
                           </div>
                         ))}
                       </div>

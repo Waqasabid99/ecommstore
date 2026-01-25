@@ -15,6 +15,22 @@ const getCart = async (req, res) => {
             include: {
                 items: {
                     include: {
+                        product: {
+                            include: {
+                                images: {
+                                    where: { isMain: true },
+                                    take: 1,
+                                },
+                                category: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        slug: true,
+                                    },
+                                },
+                                inventory: true,
+                            },
+                        },
                         productVariant: {
                             include: {
                                 product: {
@@ -56,7 +72,7 @@ const getCart = async (req, res) => {
 
         for (const item of cart.items) {
             const variant = item.productVariant;
-            const product = variant?.product;
+            const product = variant?.product ?? item.product;
 
             // Check for issues
             const issues = [];
@@ -69,7 +85,11 @@ const getCart = async (req, res) => {
                 issues.push("Product is no longer available");
             }
 
-            const availableStock = variant?.inventory?.quantity || product?.inventory?.quantity || 0;
+            const availableStock =
+                variant?.inventory?.quantity ??
+                item.product?.inventory?.quantity ??
+                0;
+
             if (availableStock < item.quantity) {
                 issues.push(
                     `Only ${availableStock} items available (you have ${item.quantity} in cart)`
@@ -79,7 +99,10 @@ const getCart = async (req, res) => {
             if (issues.length > 0) {
                 itemsWithIssues.push({
                     itemId: item.id,
+                    productId: item.productId,
+                    variantId: item.productVariantId,
                     name: product?.name || "Unknown Product",
+                    availableStock,
                     issues,
                 });
             }
@@ -87,15 +110,32 @@ const getCart = async (req, res) => {
             // Calculate item total
             const itemPrice = variant?.price
                 ? new Decimal(variant.price)
-                : new Decimal(0);
+                : product?.price
+                  ? new Decimal(product.price)
+                  : new Decimal(0);
+
             const itemTotal = itemPrice.times(item.quantity);
 
             enrichedItems.push({
-                ...item,
+                id: item.id,
+                cartId: item.cartId,
+                productId: item.productId,
+                variantId: item.productVariantId,
+                quantity: item.quantity,
+
+                name: product?.name ?? "Unknown Product",
+                slug: product?.slug ?? "unknown-product",
+                category: product?.category,
+
+                price: itemPrice.toFixed(2),
                 itemTotal: itemTotal.toFixed(2),
+
                 availableStock,
                 hasIssues: issues.length > 0,
                 issues,
+
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
             });
 
             if (issues.length === 0) {
@@ -136,168 +176,168 @@ const getCart = async (req, res) => {
  * POST /api/cart/items
  */
 const addToCart = async (req, res) => {
-  const userId = req.user?.id;
-  const { productId, variantId, quantity = 1 } = req.body;
+    const userId = req.user?.id;
+    const { productId, variantId, quantity = 1 } = req.body;
 
-  // ✅ Correct validation
-  if (!productId && !variantId) {
-    return res.status(400).json({
-      success: false,
-      error: "Either productId or variantId is required",
-    });
-  }
-
-  if (productId && variantId) {
-    return res.status(400).json({
-      success: false,
-      error: "Only one of productId or variantId is allowed",
-    });
-  }
-
-  if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) {
-    return res.status(400).json({
-      success: false,
-      error: "Quantity must be between 1 and 99",
-    });
-  }
-
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      // 1️⃣ Get or create cart
-      let cart = await tx.cart.findUnique({
-        where: { userId },
-        include: { items: true },
-      });
-
-      if (!cart) {
-        cart = await tx.cart.create({
-          data: { userId, status: "ACTIVE" },
+    // ✅ Correct validation
+    if (!productId && !variantId) {
+        return res.status(400).json({
+            success: false,
+            error: "Either productId or variantId is required",
         });
-      }
+    }
 
-      if (cart.status !== "ACTIVE") {
-        throw new Error("Cannot modify a checked-out cart");
-      }
+    if (productId && variantId) {
+        return res.status(400).json({
+            success: false,
+            error: "Only one of productId or variantId is allowed",
+        });
+    }
 
-      let stock = 0;
-      let price;
-      let name;
-      let sku = null;
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) {
+        return res.status(400).json({
+            success: false,
+            error: "Quantity must be between 1 and 99",
+        });
+    }
 
-      // 2️⃣ Variant product
-      if (variantId) {
-        const variant = await tx.productVariant.findUnique({
-          where: { id: variantId },
-          include: {
-            inventory: true,
-            product: true,
-          },
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            // 1️⃣ Get or create cart
+            let cart = await tx.cart.findUnique({
+                where: { userId },
+                include: { items: true },
+            });
+
+            if (!cart) {
+                cart = await tx.cart.create({
+                    data: { userId, status: "ACTIVE" },
+                });
+            }
+
+            if (cart.status !== "ACTIVE") {
+                throw new Error("Cannot modify a checked-out cart");
+            }
+
+            let stock = 0;
+            let price;
+            let name;
+            let sku = null;
+
+            // 2️⃣ Variant product
+            if (variantId) {
+                const variant = await tx.productVariant.findUnique({
+                    where: { id: variantId },
+                    include: {
+                        inventory: true,
+                        product: true,
+                    },
+                });
+
+                if (!variant || variant.deletedAt) {
+                    throw new Error("Product variant not found");
+                }
+
+                if (!variant.product.isActive || variant.product.deletedAt) {
+                    throw new Error("Product is no longer available");
+                }
+
+                stock = variant.inventory?.quantity ?? 0;
+                price = variant.price;
+                name = variant.product.name;
+                sku = variant.sku;
+
+                const existing = await tx.cartItem.findUnique({
+                    where: {
+                        cartId_variantId: { cartId: cart.id, variantId },
+                    },
+                });
+
+                const totalQty = (existing?.quantity ?? 0) + quantity;
+                if (totalQty > stock) {
+                    throw new Error(`Insufficient stock. Available: ${stock}`);
+                }
+
+                return tx.cartItem.upsert({
+                    where: {
+                        cartId_variantId: { cartId: cart.id, variantId },
+                    },
+                    update: {
+                        quantity: { increment: quantity },
+                        price,
+                        name,
+                        sku,
+                        userId,
+                    },
+                    create: {
+                        cartId: cart.id,
+                        variantId,
+                        quantity,
+                        price,
+                        name,
+                        sku,
+                        userId,
+                    },
+                });
+            }
+
+            // 3️⃣ Simple product
+            const product = await tx.product.findUnique({
+                where: { id: productId },
+                include: { inventory: true },
+            });
+
+            if (!product || product.deletedAt || !product.isActive) {
+                throw new Error("Product not available");
+            }
+
+            stock = product.inventory?.quantity ?? 0;
+            price = product.price;
+            name = product.name;
+
+            const existing = await tx.cartItem.findFirst({
+                where: { cartId: cart.id, productId },
+            });
+
+            const totalQty = (existing?.quantity ?? 0) + quantity;
+            if (totalQty > stock) {
+                throw new Error(`Insufficient stock. Available: ${stock}`);
+            }
+
+            return tx.cartItem.upsert({
+                where: {
+                    cartId_productId: { cartId: cart.id, productId },
+                },
+                update: {
+                    quantity: { increment: quantity },
+                    price,
+                    name,
+                    userId,
+                },
+                create: {
+                    cartId: cart.id,
+                    productId,
+                    quantity,
+                    price,
+                    name,
+                    userId,
+                },
+            });
         });
 
-        if (!variant || variant.deletedAt) {
-          throw new Error("Product variant not found");
-        }
-
-        if (!variant.product.isActive || variant.product.deletedAt) {
-          throw new Error("Product is no longer available");
-        }
-
-        stock = variant.inventory?.quantity ?? 0;
-        price = variant.price;
-        name = variant.product.name;
-        sku = variant.sku;
-
-        const existing = await tx.cartItem.findUnique({
-          where: {
-            cartId_variantId: { cartId: cart.id, variantId },
-          },
+        res.status(200).json({
+            success: true,
+            message: "Item added to cart",
+            data: result,
         });
-
-        const totalQty = (existing?.quantity ?? 0) + quantity;
-        if (totalQty > stock) {
-          throw new Error(`Insufficient stock. Available: ${stock}`);
-        }
-
-        return tx.cartItem.upsert({
-          where: {
-            cartId_variantId: { cartId: cart.id, variantId },
-          },
-          update: {
-            quantity: { increment: quantity },
-            price,
-            name,
-            sku,
-            userId,
-          },
-          create: {
-            cartId: cart.id,
-            variantId,
-            quantity,
-            price,
-            name,
-            sku,
-            userId,
-          },
+    } catch (error) {
+        console.error("Add to cart error:", error);
+        console.log(error);
+        return res.status(400).json({
+            success: false,
+            error: error.message || "Failed to add item to cart",
         });
-      }
-
-      // 3️⃣ Simple product
-      const product = await tx.product.findUnique({
-        where: { id: productId },
-        include: { inventory: true },
-      });
-
-      if (!product || product.deletedAt || !product.isActive) {
-        throw new Error("Product not available");
-      }
-
-      stock = product.inventory?.quantity ?? 0;
-      price = product.price;
-      name = product.name;
-
-      const existing = await tx.cartItem.findFirst({
-        where: { cartId: cart.id, productId },
-      });
-
-      const totalQty = (existing?.quantity ?? 0) + quantity;
-      if (totalQty > stock) {
-        throw new Error(`Insufficient stock. Available: ${stock}`);
-      }
-
-      return tx.cartItem.upsert({
-        where: {
-          cartId_productId: { cartId: cart.id, productId },
-        },
-        update: {
-          quantity: { increment: quantity },
-          price,
-          name,
-          userId,
-        },
-        create: {
-          cartId: cart.id,
-          productId,
-          quantity,
-          price,
-          name,
-          userId,
-        },
-      });
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Item added to cart",
-      data: result,
-    });
-  } catch (error) {
-    console.error("Add to cart error:", error);
-    console.log(error);
-    return res.status(400).json({
-      success: false,
-      error: error.message || "Failed to add item to cart",
-    });
-  }
+    }
 };
 
 /**
@@ -305,107 +345,107 @@ const addToCart = async (req, res) => {
  * PATCH /api/cart/items/:itemId
  */
 const updateCartItem = async (req, res) => {
-  const { itemId } = req.params;
-  const { quantity } = req.body;
-  const userId = req.user?.id;
+    const { itemId } = req.params;
+    const { quantity } = req.body;
+    const userId = req.user?.id;
 
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
-    return res.status(400).json({
-      success: false,
-      error: "Quantity must be between 1 and 99",
-    });
-  }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+        return res.status(400).json({
+            success: false,
+            error: "Quantity must be between 1 and 99",
+        });
+    }
 
-  try {
-    const updatedItem = await prisma.$transaction(async (tx) => {
-      const item = await tx.cartItem.findFirst({
-        where: { id: itemId, userId },
-        include: {
-          cart: true,
-          product: {
-            include: { inventory: true },
-          },
-          productVariant: {
-            include: {
-              inventory: true,
-              product: true,
-            },
-          },
-        },
-      });
+    try {
+        const updatedItem = await prisma.$transaction(async (tx) => {
+            const item = await tx.cartItem.findFirst({
+                where: { id: itemId, userId },
+                include: {
+                    cart: true,
+                    product: {
+                        include: { inventory: true },
+                    },
+                    productVariant: {
+                        include: {
+                            inventory: true,
+                            product: true,
+                        },
+                    },
+                },
+            });
 
-      if (!item) throw new Error("Cart item not found");
-      if (item.cart.status !== "ACTIVE") {
-        throw new Error("Cannot modify a checked-out cart");
-      }
+            if (!item) throw new Error("Cart item not found");
+            if (item.cart.status !== "ACTIVE") {
+                throw new Error("Cannot modify a checked-out cart");
+            }
 
-      // 🚨 Defensive check — cart item must be simple OR variant
-      const isSimple = !!item.productId;
-      const isVariant = !!item.productVariantId;
+            // 🚨 Defensive check — cart item must be simple OR variant
+            const isSimple = !!item.productId;
+            const isVariant = !!item.productVariantId;
 
-      if (isSimple === isVariant) {
-        throw new Error("Invalid cart item state");
-      }
+            if (isSimple === isVariant) {
+                throw new Error("Invalid cart item state");
+            }
 
-      let stock;
-      let price;
+            let stock;
+            let price;
 
-      // 🔁 Variant product
-      if (isVariant) {
-        const variant = item.productVariant;
+            // 🔁 Variant product
+            if (isVariant) {
+                const variant = item.productVariant;
 
-        if (
-          !variant ||
-          variant.deletedAt ||
-          !variant.product.isActive ||
-          variant.product.deletedAt
-        ) {
-          throw new Error("Product is no longer available");
-        }
+                if (
+                    !variant ||
+                    variant.deletedAt ||
+                    !variant.product.isActive ||
+                    variant.product.deletedAt
+                ) {
+                    throw new Error("Product is no longer available");
+                }
 
-        stock = variant.inventory?.quantity ?? 0;
-        price = variant.price;
-      }
+                stock = variant.inventory?.quantity ?? 0;
+                price = variant.price;
+            }
 
-      // 🔁 Simple product
-      if (isSimple) {
-        const product = item.product;
+            // 🔁 Simple product
+            if (isSimple) {
+                const product = item.product;
 
-        if (!product || product.deletedAt || !product.isActive) {
-          throw new Error("Product is no longer available");
-        }
+                if (!product || product.deletedAt || !product.isActive) {
+                    throw new Error("Product is no longer available");
+                }
 
-        stock = product.inventory?.quantity ?? 0;
-        price = product.price;
-      }
+                stock = product.inventory?.quantity ?? 0;
+                price = product.price;
+            }
 
-      if (quantity > stock) {
-        throw new Error(`Insufficient stock. Available: ${stock}`);
-      }
+            if (quantity > stock) {
+                throw new Error(`Insufficient stock. Available: ${stock}`);
+            }
 
-      return tx.cartItem.update({
-        where: { id: item.id },
-        data: {
-          quantity,
-          price, // re-sync price on update
-        },
-      });
-    });
+            return tx.cartItem.update({
+                where: { id: item.id },
+                data: {
+                    quantity,
+                    price, // re-sync price on update
+                },
+            });
+        });
 
-    return res.status(200).json({
-      success: true,
-      message: "Cart item updated successfully",
-      data: updatedItem,
-    });
-  } catch (error) {
-    console.error("Update cart item error:", error);
-    console.log(error);
+        return res.status(200).json({
+            success: true,
+            message: "Cart item updated successfully",
+            data: updatedItem,
+        });
+    } catch (error) {
+        console.error("Update cart item error:", error);
+        console.log(error);
 
-    return res.status(400).json({
-      success: false,
-      error: error.message || "Failed to update cart item",
-    });
-  }
+        return res.status(400).json({
+            success: false,
+            error: error.message || "Failed to update cart item",
+        });
+    }
 };
 
 /**
@@ -413,43 +453,43 @@ const updateCartItem = async (req, res) => {
  * DELETE /api/cart/items/:itemId
  */
 const removeCartItem = async (req, res) => {
-  const { id: itemId } = req.params;
-  const userId = req.user?.id;
+    const { id: itemId } = req.params;
+    const userId = req.user?.id;
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const item = await tx.cartItem.findUnique({
-        where: { id: itemId },
-        include: { cart: true },
-      });
+    try {
+        await prisma.$transaction(async (tx) => {
+            const item = await tx.cartItem.findUnique({
+                where: { id: itemId },
+                include: { cart: true },
+            });
 
-      if (!item) throw new Error("Cart item not found");
+            if (!item) throw new Error("Cart item not found");
 
-      if (item.userId !== userId) {
-        throw new Error("Unauthorized cart access");
-      }
+            if (item.userId !== userId) {
+                throw new Error("Unauthorized cart access");
+            }
 
-      if (item.cart.status !== "ACTIVE") {
-        throw new Error("Cannot modify a checked-out cart");
-      }
+            if (item.cart.status !== "ACTIVE") {
+                throw new Error("Cannot modify a checked-out cart");
+            }
 
-      await tx.cartItem.delete({
-        where: { id: itemId },
-      });
-    });
+            await tx.cartItem.delete({
+                where: { id: itemId },
+            });
+        });
 
-    return res.status(200).json({
-      success: true,
-      message: "Item removed from cart successfully",
-    });
-  } catch (error) {
-    console.error("Remove cart item error:", error);
+        return res.status(200).json({
+            success: true,
+            message: "Item removed from cart successfully",
+        });
+    } catch (error) {
+        console.error("Remove cart item error:", error);
 
-    return res.status(400).json({
-      success: false,
-      error: error.message || "Failed to remove cart item",
-    });
-  }
+        return res.status(400).json({
+            success: false,
+            error: error.message || "Failed to remove cart item",
+        });
+    }
 };
 
 /**
@@ -635,8 +675,7 @@ const mergeCart = async (req, res) => {
                         variantId,
                         name: variant.product.name,
                         quantity: finalQuantity,
-                        adjusted:
-                            finalQuantity !== currentQuantity + quantity,
+                        adjusted: finalQuantity !== currentQuantity + quantity,
                     });
                 } catch (itemError) {
                     console.error(

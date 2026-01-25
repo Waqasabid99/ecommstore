@@ -20,7 +20,7 @@ const Cart = () => {
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
 
-  const { getCartItems, getCartSummary, updateCartItem, removeCartItem } = useCartStore();
+  const { getCartItems, getCartSummary, updateCartItem, removeCartItem, isLoading } = useCartStore();
   const { totalQuantity, subtotal } = getCartSummary();
   const cartItems = getCartItems();
 
@@ -141,15 +141,18 @@ const Cart = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start gap-2 mb-2">
                         <div>
-                          {/* <span className="text-[10px] text-(--text-inverse) bg-(--bg-primary) border border-(--border-default) rounded-full px-3 py-1 inline-block mb-2">
-                            {item.category}
-                          </span> */}
+                          <span className="text-[10px] text-(--text-inverse) bg-(--bg-primary) border border-(--border-default) rounded-full px-3 py-1 inline-block mb-2">
+                            {item.category.name}
+                          </span>
+                          <Link href={`/shop/products/${item.slug}`}>
                           <h3 className="font-semibold text-(--text-heading) text-lg mb-1">
                             {item.name}
                           </h3>
-                          {/* <p className="text-xs text-(--text-secondary) capitalize">
-                            Category: {item.category}
-                          </p> */}
+                          </Link>
+                         
+                          <p className="text-xs text-(--text-secondary) capitalize">
+                            Category: {item.category.name}
+                          </p>
                         </div>
                         <button
                           onClick={() => removeItem(item.id)}
@@ -180,10 +183,11 @@ const Cart = () => {
                               {item.quantity}
                             </span>
                             <button
+                              disabled={item.quantity === 99 || isLoading}
                               onClick={() =>
                                 updateQuantity(item.id, item.quantity, 1)
                               }
-                              className="p-2 hover:bg-(--bg-surface) rounded-r-full transition-colors"
+                              className={isLoading ? "cursor-grab p-2 hover:bg-(--bg-surface) rounded-r-full transition-colors" : "p-2 hover:bg-(--bg-surface) rounded-r-full transition-colors"}
                               aria-label="Increase quantity"
                             >
                               <Plus size={16} />

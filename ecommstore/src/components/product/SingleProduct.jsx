@@ -1,64 +1,91 @@
-'use client';
-import { useState } from 'react';
-import { Heart, ShoppingCart, Minus, Plus, Truck, Shield, RotateCcw, Share2, Star, Check } from 'lucide-react';
-import ProductRating from '@/components/ui/ProductRating';
-import ProductCard from '@/components/product/ProductCard';
-import { usePathname } from 'next/navigation';
-import { baseUrl } from '@/lib/utils';
+"use client";
+import { useState } from "react";
+import {
+  Heart,
+  ShoppingCart,
+  Minus,
+  Plus,
+  Truck,
+  Shield,
+  RotateCcw,
+  Share2,
+  Star,
+  Check,
+} from "lucide-react";
+import ProductRating from "@/components/ui/ProductRating";
+import ProductCard from "@/components/product/ProductCard";
+import { usePathname } from "next/navigation";
+import { baseUrl } from "@/lib/utils";
+import useCartStore from "@/store/useCartStore";
+import Loader from "../ui/Loader";
 
 // Product Page
 const SingleProductPage = ({ products }) => {
-    console.log(products)
-  const slug = usePathname().split('/').pop();
-  console.log(slug);
+  const slug = usePathname().split("/").pop();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('description');
-  const product = products.find(product => product.slug === slug);
-
-  const relatedProducts = products.filter(product => product.categoryId === product.categoryId);
-  const isMain = product.images.find(img => img.isMain);
+  const [activeTab, setActiveTab] = useState("description");
+  const product = products.find((product) => product.slug === slug);
+  const { addToCart, isLoading } = useCartStore();
+  const handleAddToCart = async () => {
+    await addToCart({
+      productId: product.id,
+      variantId: product.variants?.[0]?.id,
+      quantity: quantity,
+      product,
+    });
+  };
+  const relatedProducts = products.filter(
+    (product) => product.categoryId === product.categoryId,
+  );
+  const isMain = product?.images?.find((img) => img.isMain);
 
   const handleQuantityChange = (type) => {
-    if (type === 'increase') {
-      setQuantity(prev => prev + 1);
-    } else if (type === 'decrease' && quantity > 1) {
-      setQuantity(prev => prev - 1);
+    if (type === "increase") {
+      setQuantity((prev) => prev + 1);
+    } else if (type === "decrease" && quantity > 1) {
+      setQuantity((prev) => prev - 1);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
-      
       {/* Product Section */}
       <section className="mx-4 mb-6">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-8 bg-white border border-(--border-default) rounded-xl p-6 md:p-8">
-            
             {/* Left - Images */}
             <div className="space-y-4">
               {/* Main Image */}
               <div className="border border-(--border-default) rounded-xl overflow-hidden bg-(--bg-surface) aspect-square flex items-center justify-center">
                 <img
-                  src={`${product.images.length > 0 ? `${baseUrl}${selectedImage ? product.images.find(img => img.id === selectedImage).url : isMain.url}` : '/placeholder.png'} `}
-                  alt={product.images.length > 0 ? `Product ${selectedImage ? selectedImage + 1 : isMain.id + 1}` : 'Product'}
+                  src={`${product?.images?.length > 0 ? `${baseUrl}${selectedImage ? product.images.find((img) => img.id === selectedImage).url : isMain.url}` : "/placeholder.png"} `}
+                  alt={
+                    product?.images?.length > 0
+                      ? `Product ${selectedImage ? selectedImage + 1 : isMain.id + 1}`
+                      : "Product"
+                  }
                   className="w-full h-full object-cover"
                 />
               </div>
 
               {/* Thumbnail Images */}
               <div className="grid grid-cols-4 gap-3">
-                {product.images?.map((img) => (
+                {product?.images?.map((img) => (
                   <button
                     key={img.id}
                     onClick={() => setSelectedImage(img.id)}
                     className={`border-2 rounded-lg overflow-hidden aspect-square transition-all ${
                       selectedImage === img.id
-                        ? 'border-(--color-brand-primary)'
-                        : 'border-(--border-default) hover:border-gray-500'
+                        ? "border-(--color-brand-primary)"
+                        : "border-(--border-default) hover:border-gray-500"
                     }`}
                   >
-                    <img src={`${baseUrl}${img.url}`} alt={`Product ${img.id + 1}`} className="w-full h-full object-cover" />
+                    <img
+                      src={`${baseUrl}${img.url}`}
+                      alt={`Product ${img.id + 1}`}
+                      className="w-full h-full object-cover"
+                    />
                   </button>
                 ))}
               </div>
@@ -69,20 +96,31 @@ const SingleProductPage = ({ products }) => {
               {/* Badge and Title */}
               <div>
                 <span className="inline-block text-[10px] text-(--text-inverse) bg-(--bg-primary) border border-(--border-default) rounded-full px-3 py-1 mb-3">
-                  {product.category?.name}
+                  {product?.category?.name}
                 </span>
                 <h1 className="text-3xl md:text-4xl font-bold text-(--text-heading) mb-2">
                   {product.name}
                 </h1>
                 <p className="text-(--text-secondary) text-sm">
-                  Brand: <span className="font-medium text-(--text-primary)">{product.brand}</span> | 
-                  SKU: <span className="font-medium text-(--text-primary)">{product.sku}</span>
+                  Brand:{" "}
+                  <span className="font-medium text-(--text-primary)">
+                    {product.brand}
+                  </span>{" "}
+                  | SKU:{" "}
+                  <span className="font-medium text-(--text-primary)">
+                    {product.sku}
+                  </span>
                 </p>
               </div>
 
               {/* Rating */}
               <div className="flex items-center gap-4 pb-4 border-b border-(--border-default)">
-                <ProductRating rating={product.rating} showCount reviewCount={product.reviewCount} size="lg" />
+                <ProductRating
+                  rating={product.rating}
+                  showCount
+                  reviewCount={product.reviewCount}
+                  size="lg"
+                />
               </div>
 
               {/* Price */}
@@ -90,21 +128,21 @@ const SingleProductPage = ({ products }) => {
                 <span className="text-4xl font-bold text-red-500">
                   Rs. {product.price}
                 </span>
-                {product.discount && (   
-                <> 
-                <span className="text-xl text-(--text-secondary) line-through">
-                  Rs. {product.originalPrice}
-                </span>
-                <span className="bg-red-500 text-white text-sm font-semibold px-3 py-1 rounded-full">
-                  {product.discount}% OFF
-                </span>
-                </>  
+                {product.discount && (
+                  <>
+                    <span className="text-xl text-(--text-secondary) line-through">
+                      Rs. {product.originalPrice}
+                    </span>
+                    <span className="bg-red-500 text-white text-sm font-semibold px-3 py-1 rounded-full">
+                      {product.discount}% OFF
+                    </span>
+                  </>
                 )}
               </div>
 
               {/* Stock Status */}
               <div className="flex items-center gap-2">
-                {product.isActive ? (
+                {product.isActive && quantity > 0 ? (
                   <>
                     <Check size={20} className="text-green-500" />
                     <span className="text-green-500 font-medium">In Stock</span>
@@ -116,7 +154,9 @@ const SingleProductPage = ({ products }) => {
 
               {/* Key Features */}
               <div className="space-y-2 pb-4 border-b border-(--border-default)">
-                <h3 className="font-semibold text-(--text-heading)">Key Features:</h3>
+                <h3 className="font-semibold text-(--text-heading)">
+                  Key Features:
+                </h3>
                 {/* <ul className="grid grid-cols-2 gap-2">
                   {product.features.map((feature, index) => (
                     <li key={index} className="flex items-start gap-2 text-sm text-(--text-secondary)">
@@ -129,18 +169,20 @@ const SingleProductPage = ({ products }) => {
 
               {/* Quantity Selector */}
               <div className="space-y-3">
-                <label className="font-semibold text-(--text-heading)">Quantity:</label>
+                <label className="font-semibold text-(--text-heading)">
+                  Quantity:
+                </label>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center border border-(--border-default) rounded-lg">
                     <button
-                      onClick={() => handleQuantityChange('decrease')}
+                      onClick={() => handleQuantityChange("decrease")}
                       className="p-3 hover:bg-(--bg-surface) transition-colors"
                     >
                       <Minus size={18} />
                     </button>
                     <span className="px-6 font-semibold">{quantity}</span>
                     <button
-                      onClick={() => handleQuantityChange('increase')}
+                      onClick={() => handleQuantityChange("increase")}
                       className="p-3 hover:bg-(--bg-surface) transition-colors"
                     >
                       <Plus size={18} />
@@ -151,10 +193,32 @@ const SingleProductPage = ({ products }) => {
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3">
-                <button className="flex-1 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium flex items-center justify-center gap-2">
-                  <ShoppingCart size={20} />
-                  Add to Cart
+                <button
+                  onClick={handleAddToCart}
+                  disabled={quantity === 0 || isLoading || !product.isActive}
+                  className={`
+    flex-1 px-6 py-4 rounded-full font-medium
+    flex items-center justify-center gap-2
+    transition-all duration-200
+    ${
+      quantity === 0 || !product.isActive || isLoading
+        ? "cursor-not-allowed bg-(--btn-bg-primary) bg-opacity-50 text-(--btn-text-primary) opacity-70"
+        : "bg-(--btn-bg-primary) text-(--btn-text-primary) hover:bg-(--btn-bg-hover)"
+    }
+  `}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader text={"Adding..."} />
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={20} />
+                      <span>Add to Cart</span>
+                    </>
+                  )}
                 </button>
+
                 <button className="border-2 border-(--border-inverse) text-(--text-primary) px-6 py-4 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium flex items-center justify-center gap-2">
                   <Heart size={20} />
                   Wishlist
@@ -167,19 +231,27 @@ const SingleProductPage = ({ products }) => {
               {/* Info Cards */}
               <div className="grid grid-cols-3 gap-3 pt-4">
                 <div className="flex flex-col items-center text-center p-4 border border-(--border-default) rounded-lg">
-                  <Truck size={24} className="text-(--color-brand-primary) mb-2" />
+                  <Truck
+                    size={24}
+                    className="text-(--color-brand-primary) mb-2"
+                  />
                   <span className="text-xs font-medium">Free Delivery</span>
                 </div>
                 <div className="flex flex-col items-center text-center p-4 border border-(--border-default) rounded-lg">
-                  <RotateCcw size={24} className="text-(--color-brand-primary) mb-2" />
+                  <RotateCcw
+                    size={24}
+                    className="text-(--color-brand-primary) mb-2"
+                  />
                   <span className="text-xs font-medium">30 Days Return</span>
                 </div>
                 <div className="flex flex-col items-center text-center p-4 border border-(--border-default) rounded-lg">
-                  <Shield size={24} className="text-(--color-brand-primary) mb-2" />
+                  <Shield
+                    size={24}
+                    className="text-(--color-brand-primary) mb-2"
+                  />
                   <span className="text-xs font-medium">2 Year Warranty</span>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -191,31 +263,31 @@ const SingleProductPage = ({ products }) => {
           {/* Tabs */}
           <div className="flex border-b border-(--border-default)">
             <button
-              onClick={() => setActiveTab('description')}
+              onClick={() => setActiveTab("description")}
               className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                activeTab === 'description'
-                  ? 'text-(--color-brand-primary) border-b-2 border-(--color-brand-primary)'
-                  : 'text-(--text-secondary) hover:text-(--text-primary)'
+                activeTab === "description"
+                  ? "text-(--color-brand-primary) border-b-2 border-(--color-brand-primary)"
+                  : "text-(--text-secondary) hover:text-(--text-primary)"
               }`}
             >
               Description
             </button>
             <button
-              onClick={() => setActiveTab('specifications')}
+              onClick={() => setActiveTab("specifications")}
               className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                activeTab === 'specifications'
-                  ? 'text-(--color-brand-primary) border-b-2 border-(--color-brand-primary)'
-                  : 'text-(--text-secondary) hover:text-(--text-primary)'
+                activeTab === "specifications"
+                  ? "text-(--color-brand-primary) border-b-2 border-(--color-brand-primary)"
+                  : "text-(--text-secondary) hover:text-(--text-primary)"
               }`}
             >
               Specifications
             </button>
             <button
-              onClick={() => setActiveTab('reviews')}
+              onClick={() => setActiveTab("reviews")}
               className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                activeTab === 'reviews'
-                  ? 'text-(--color-brand-primary) border-b-2 border-(--color-brand-primary)'
-                  : 'text-(--text-secondary) hover:text-(--text-primary)'
+                activeTab === "reviews"
+                  ? "text-(--color-brand-primary) border-b-2 border-(--color-brand-primary)"
+                  : "text-(--text-secondary) hover:text-(--text-primary)"
               }`}
             >
               Reviews ({product.reviewCount})
@@ -224,18 +296,22 @@ const SingleProductPage = ({ products }) => {
 
           {/* Tab Content */}
           <div className="p-6 md:p-8">
-            {activeTab === 'description' && (
+            {activeTab === "description" && (
               <div className="prose max-w-none">
-                <h3 className="text-2xl font-bold mb-4 text-(--text-heading)">Product Description</h3>
+                <h3 className="text-2xl font-bold mb-4 text-(--text-heading)">
+                  Product Description
+                </h3>
                 <p className="text-(--text-secondary) leading-relaxed mb-4">
-                 {product.description}               
+                  {product.description}
                 </p>
               </div>
             )}
 
-            {activeTab === 'specifications' && (
+            {activeTab === "specifications" && (
               <div>
-                <h3 className="text-2xl font-bold mb-6 text-(--text-heading)">Technical Specifications</h3>
+                <h3 className="text-2xl font-bold mb-6 text-(--text-heading)">
+                  Technical Specifications
+                </h3>
                 {/* <div className="grid md:grid-cols-2 gap-4">
                   {Object.entries(product.specifications).map(([key, value], index) => (
                     <div key={index} className="flex justify-between items-center p-4 bg-(--bg-surface) rounded-lg">
@@ -247,12 +323,16 @@ const SingleProductPage = ({ products }) => {
               </div>
             )}
 
-            {activeTab === 'reviews' && (
+            {activeTab === "reviews" && (
               <div>
-                <h3 className="text-2xl font-bold mb-6 text-(--text-heading)">Customer Reviews</h3>
+                <h3 className="text-2xl font-bold mb-6 text-(--text-heading)">
+                  Customer Reviews
+                </h3>
                 <div className="text-center py-12">
                   <Star size={48} className="text-gray-300 mx-auto mb-4" />
-                  <p className="text-(--text-secondary)">No reviews yet. Be the first to review this product!</p>
+                  <p className="text-(--text-secondary)">
+                    No reviews yet. Be the first to review this product!
+                  </p>
                   <button className="mt-4 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium">
                     Write a Review
                   </button>
@@ -268,19 +348,22 @@ const SingleProductPage = ({ products }) => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-(--text-heading)">Related Products</h2>
-              <p className="text-(--text-secondary) mt-1">You might also like these items</p>
+              <h2 className="text-2xl md:text-3xl font-bold text-(--text-heading)">
+                Related Products
+              </h2>
+              <p className="text-(--text-secondary) mt-1">
+                You might also like these items
+              </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.map(product => (
+            {relatedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </div>
       </section>
-
     </div>
   );
 };

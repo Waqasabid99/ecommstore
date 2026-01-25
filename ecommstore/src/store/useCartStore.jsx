@@ -6,7 +6,10 @@ const useCartStore = create(
   persist(
     (set, get) => ({
       // STATE
-      cart: null, // Full cart object for authenticated users
+      cart: null,        // cart metadata only
+      items: [],         // cart items
+      summary: null,     // totals
+      issues: null,      // cart issues
       guestCart: [], // Array of items for guest users
       isLoading: false,
       error: null,
@@ -78,6 +81,8 @@ const useCartStore = create(
           const { data } = await api.get("/cart");
           set({ 
             cart: data.data, 
+            items: data.data.items, 
+            summary: data.data.summary,
             isLoading: false,
             guestCart: [] // Clear guest cart when authenticated
           });
@@ -188,7 +193,7 @@ const useCartStore = create(
           const { data } = await api.patch(`/cart/update-item/${itemId}`, { quantity });
           
           // Refresh cart
-          // await get().initializeCart();
+          await get().initializeCart();
           
           set({ isLoading: false });
           return { success: true, data: data.data };

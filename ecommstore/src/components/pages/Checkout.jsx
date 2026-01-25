@@ -1,40 +1,41 @@
 'use client';
 import { useState } from 'react';
-import { CreditCard, Truck, MapPin, User, Mail, Phone, Home, Building2, Lock, ShoppingBag, CheckCircle, ArrowLeft } from 'lucide-react';
-
-// Sample order items - would come from cart state
-const orderItems = [
-  {
-    id: 1,
-    name: "Wireless Bluetooth Headphones",
-    price: 12999,
-    quantity: 1,
-    thumbnail: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&h=200&fit=crop"
-  },
-  {
-    id: 2,
-    name: "Smart Watch Pro Series 7",
-    price: 45999,
-    quantity: 2,
-    thumbnail: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop"
-  }
-];
+import { CreditCard, Truck, MapPin, User, Mail, Phone, Home, Building2, Lock, ShoppingBag, CheckCircle, ArrowLeft, X, Key, Eye, EyeClosed } from 'lucide-react';
+import useAuth from '@/hooks/useAuth';
+import { Country, State, City }  from 'country-state-city';
+import useCartStore from '@/store/useCartStore';
+import Select from 'react-select';
+import { getStatesOfCountry } from 'country-state-city/lib/state';
 
 const Checkout = () => {
   const [step, setStep] = useState(1); // 1: shipping, 2: payment, 3: confirmation
   const [paymentMethod, setPaymentMethod] = useState('cod');
-  
+  const [hasAccount, setHasAccount] = useState(false);
+  const [stateOptions, setStateOptions] = useState([]);
+  const [cityOptions, setCityOptions] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [sameAsShipping, setSameAsShipping] = useState(true);
+  const { getCartItems, getCartSummary, updateCartItem, removeCartItem, isLoading } = useCartStore();
+  const { isAuthenticated, user } = useAuth();
+  const { totalQuantity, subtotal } = getCartSummary();
+  const orderItems = getCartItems();
+  const countryOptions = Country.getAllCountries().map((country) => ({ value: country.isoCode, label: country.name }));
+  const states = stateOptions.map((state) => ({ value: state.isoCode, label: state.name }));
+  const cities = cityOptions.map((city) => ({ value: city.name, label: city.name }));
   const [shippingInfo, setShippingInfo] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    password: '',
     phone: '',
     address: '',
     city: '',
+    country: '',
     province: '',
     postalCode: ''
   });
-
+  
+  console.log(hasAccount)
   const [billingInfo, setBillingInfo] = useState({
     cardNumber: '',
     cardName: '',
@@ -42,13 +43,10 @@ const Checkout = () => {
     cvv: ''
   });
 
-  const [sameAsShipping, setSameAsShipping] = useState(true);
-
   // Calculate totals
-  const subtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = 299;
   const tax = subtotal * 0.17;
-  const total = subtotal + shipping + tax;
+  const total = parseInt(subtotal) + shipping + tax;
 
   const handleShippingChange = (e) => {
     const { name, value } = e.target;
@@ -224,6 +222,7 @@ const Checkout = () => {
 
                   <div className="space-y-4">
                     {/* Name */}
+                    {hasAccount ? null : (
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-(--text-heading) mb-2">
@@ -260,7 +259,10 @@ const Checkout = () => {
                           />
                         </div>
                       </div>
+                      {/* Toggle between "Have an account?" and "Create an account" */}
+                      <span onClick={() => setHasAccount(prev => !prev)} className='text-(--text-hover) font-semibold cursor-pointer hover:text-(--text-primary)'>Already have an account?</span>
                     </div>
+                    )}
 
                     {/* Contact */}
                     <div className="grid md:grid-cols-2 gap-4">
@@ -281,7 +283,25 @@ const Checkout = () => {
                           />
                         </div>
                       </div>
-
+                      <div>
+                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                          Password *
+                        </label>
+                        <div className="relative">
+                          <Key size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)" />
+                          {showPassword ? <Eye role='button' aria-label='Show Password' onClick={() => setShowPassword(prev => !prev)} size={18} className="absolute cursor-pointer right-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)"/> : <EyeClosed role ='button' aria-label='Hide Password' onClick={() => setShowPassword(prev => !prev)} size={18} className="absolute cursor-pointer right-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)"/> }
+                          
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            name="password"
+                            value={shippingInfo.password}
+                            onChange={handleShippingChange}
+                            required
+                            className="w-full pl-10 pr-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                            placeholder="12345678"
+                          />
+                        </div>
+                      </div>
                       <div>
                         <label className="block text-sm font-medium text-(--text-heading) mb-2">
                           Phone Number *
@@ -299,6 +319,10 @@ const Checkout = () => {
                           />
                         </div>
                       </div>
+                      {!hasAccount ? null : (
+                        <button onClick={() => setHasAccount(prev => !prev)} className='text-(--text-hover) font-semibold hover:text-(--text-primary)'>Don't have an account?</button>
+                      )}
+
                     </div>
 
                     {/* Address */}
@@ -319,7 +343,7 @@ const Checkout = () => {
                         />
                       </div>
                     </div>
-
+              
                     {/* City & Province */}
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
@@ -328,45 +352,62 @@ const Checkout = () => {
                         </label>
                         <div className="relative">
                           <Building2 size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)" />
-                          <input
-                            type="text"
+                          <Select
                             name="city"
-                            value={shippingInfo.city}
-                            onChange={handleShippingChange}
+                            isClearable={true}
+                            isSearchable={true}
+                            options={cities}
+                            onChange={option => setShippingInfo(prev => ({ ...prev, city: option?.value }))}
                             required
-                            className="w-full pl-10 pr-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                            className="basic-single"
                             placeholder="Lahore"
                           />
                         </div>
                       </div>
-
                       <div>
                         <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                          Province *
+                          Country *
+                        </label>
+                        <div className="relative">
+                          <Building2 size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)" />
+                          <Select
+                            name="country"
+                            isClearable={true}
+                            isSearchable={true}
+                            options={countryOptions}
+                            onChange={option => 
+                              {
+                                setShippingInfo(prev => ({ ...prev, country: option?.value || '' }));
+                                setStateOptions(State.getStatesOfCountry(option?.value || ''));
+                                setCityOptions(City.getCitiesOfCountry(option?.value || ''));
+                              }}
+                            styles={''}
+                            required
+                            className="basic-single"
+                            classNamePrefix='select'
+                            placeholder="PK"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                          State / Province *
                         </label>
                         <div className="relative">
                           <MapPin size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)" />
-                          <select
+                          <Select
                             name="province"
-                            value={shippingInfo.province}
-                            onChange={handleShippingChange}
+                            isClearable={true}
+                            isSearchable={true}
+                            options={states}
+                            onChange={option => setShippingInfo(prev => ({ ...prev, province: option?.value }))}
                             required
-                            className="w-full pl-10 pr-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors appearance-none"
-                          >
-                            <option value="">Select Province</option>
-                            <option value="Punjab">Punjab</option>
-                            <option value="Sindh">Sindh</option>
-                            <option value="KPK">Khyber Pakhtunkhwa</option>
-                            <option value="Balochistan">Balochistan</option>
-                            <option value="Gilgit">Gilgit-Baltistan</option>
-                            <option value="AJK">Azad Kashmir</option>
-                          </select>
+                            className="basic-single"
+                          />
                         </div>
                       </div>
-                    </div>
-
                     {/* Postal Code */}
-                    <div className="md:w-1/2">
+                    <div className="relative">
                       <label className="block text-sm font-medium text-(--text-heading) mb-2">
                         Postal Code
                       </label>
@@ -375,9 +416,10 @@ const Checkout = () => {
                         name="postalCode"
                         value={shippingInfo.postalCode}
                         onChange={handleShippingChange}
-                        className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                        className="w-full px-4 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors"
                         placeholder="54000"
                       />
+                    </div>
                     </div>
                   </div>
 

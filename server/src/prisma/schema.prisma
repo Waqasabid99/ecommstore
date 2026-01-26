@@ -1,8 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// =====================================================
+// Prisma Schema — Production-Grade Variant-First Ecommerce
+// =====================================================
 
 generator client {
   provider = "prisma-client"
@@ -13,6 +11,10 @@ datasource db {
   provider = "postgresql"
 }
 
+// =====================
+// ENUMS
+// =====================
+
 enum Role {
   USER
   ADMIN
@@ -20,6 +22,7 @@ enum Role {
 
 enum OrderStatus {
   PENDING
+  AWAITING_PAYMENT
   PAID
   SHIPPED
   DELIVERED
@@ -67,6 +70,10 @@ enum AuditAction {
   REFUND
 }
 
+// =====================
+// USER & AUTH
+// =====================
+
 model User {
   id       String  @id @default(uuid())
   userName String
@@ -74,18 +81,18 @@ model User {
   password String?
   role     Role    @default(USER)
 
-  orders    Order[]
-  addresses Address[]
-  cartItems CartItem[]
-  reviews   Review[]
-
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  deletedAt           DateTime?
-  returnRequests      ReturnRequest[]
+  orders              Order[]
+  addresses           Address[]
+  carts               Cart[]
+  reviews             Review[]
   auditLogs           AuditLog[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  returnRequests ReturnRequest[]
 
   @@index([email])
 }
@@ -93,7 +100,7 @@ model User {
 model RefreshToken {
   id     String @id @default(uuid())
   userId String
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tokenHash String
   revoked   Boolean  @default(false)
@@ -120,10 +127,14 @@ model PasswordResetToken {
   @@index([tokenHash])
 }
 
+// =====================
+// ADDRESS
+// =====================
+
 model Address {
   id     String @id @default(uuid())
   userId String
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   fullName   String
   phone      String
@@ -139,11 +150,16 @@ model Address {
   createdAt DateTime @default(now())
 }
 
+// =====================
+// CATALOG
+// =====================
+
 model Category {
-  id       String     @id @default(uuid())
+  id       String  @id @default(uuid())
   name     String
-  slug     String     @unique
+  slug     String  @unique
   parentId String?
+
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
 
@@ -157,8 +173,6 @@ model Product {
   name        String
   slug        String  @unique
   description String
-  price       Decimal
-  quantity    Int     @default(1)
   isActive    Boolean @default(true)
 
   categoryId String
@@ -168,12 +182,9 @@ model Product {
   images   ProductImage[]
   reviews  Review[]
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime?
-  inventory   Inventory?
-  hasVariants Boolean    @default(false)
-  cartItems   CartItem[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([categoryId])
   @@index([isActive])
@@ -182,30 +193,33 @@ model Product {
 model ProductVariant {
   id        String  @id @default(uuid())
   productId String
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   sku        String  @unique
   price      Decimal
-  attributes Json
+  attributes Json?
 
   inventory Inventory?
 
-  createdAt  DateTime    @default(now())
-  deletedAt  DateTime?
   cartItems  CartItem[]
   orderItems OrderItem[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([productId])
 }
 
 model Inventory {
-  id        String          @id @default(uuid())
-  variantId String?         @unique
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
-  productId String?         @unique
-  product   Product?        @relation(fields: [productId], references: [id])
-  quantity  Int
-  updatedAt DateTime        @updatedAt
+  id        String         @id @default(uuid())
+  variantId String         @unique
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity Int
+  reserved Int @default(0)
+
+  updatedAt DateTime @updatedAt
 
   @@index([quantity])
 }
@@ -213,27 +227,33 @@ model Inventory {
 model ProductImage {
   id        String  @id @default(uuid())
   productId String
-  product   Product @relation(fields: [productId], references: [id])
+  publicId  String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   url    String
   isMain Boolean @default(false)
 }
 
+// =====================
+// CART
+// =====================
+
 model Cart {
   id String @id @default(uuid())
 
-  userId    String? @unique
-  sessionId String? @unique // for guest carts
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sessionId String? @unique
 
   status CartStatus @default(ACTIVE)
+
+  items CartItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items CartItem[]
-
   @@index([userId])
-  @@index([sessionId])
 }
 
 model CartItem {
@@ -242,28 +262,26 @@ model CartItem {
   cartId String
   cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
 
-  productId String?
-  product   Product? @relation(fields: [productId], references: [id])
-  variantId String?
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
 
-  quantity Int @default(1)
+  quantity Int
 
+  // Snapshots
   price Decimal
   name  String
-  sku   String?
+  sku   String
 
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  user             User?           @relation(fields: [userId], references: [id])
-  userId           String?
-  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
-  productVariantId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([cartId, productId])
+  @@unique([cartId, variantId])
   @@index([cartId])
-  @@index([productId])
-  @@index([variantId])
 }
+
+// =====================
+// ORDER & PAYMENT
+// =====================
 
 model Order {
   id     String @id @default(uuid())
@@ -295,20 +313,19 @@ model OrderItem {
   orderId   String
   variantId String
 
-  order   Order          @relation(fields: [orderId], references: [id])
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [variantId], references: [id])
 
   price    Decimal
   quantity Int
 
   @@index([orderId])
-  @@index([variantId])
 }
 
 model Payment {
   id      String @id @default(uuid())
   orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   provider      String
   status        PaymentStatus
@@ -323,13 +340,17 @@ model Payment {
   @@index([transactionId])
 }
 
+// =====================
+// REVIEWS
+// =====================
+
 model Review {
   id        String @id @default(uuid())
   userId    String
   productId String
 
-  user    User    @relation(fields: [userId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   rating  Int
   comment String?
@@ -338,6 +359,10 @@ model Review {
 
   @@unique([userId, productId])
 }
+
+// =====================
+// COUPONS
+// =====================
 
 model Coupon {
   id          String   @id @default(uuid())
@@ -349,13 +374,17 @@ model Coupon {
   isActive    Boolean  @default(true)
 }
 
+// =====================
+// REFUNDS & RETURNS
+// =====================
+
 model Refund {
   id        String @id @default(uuid())
   orderId   String
   paymentId String
 
-  order   Order   @relation(fields: [orderId], references: [id])
-  payment Payment @relation(fields: [paymentId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   amount Decimal
   reason String?
@@ -365,7 +394,6 @@ model Refund {
 
   @@index([orderId])
   @@index([paymentId])
-  @@index([status])
 }
 
 model ReturnRequest {
@@ -373,8 +401,8 @@ model ReturnRequest {
   orderId String
   userId  String
 
-  order Order @relation(fields: [orderId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   reason String
   status ReturnStatus @default(REQUESTED)
@@ -384,8 +412,11 @@ model ReturnRequest {
 
   @@index([orderId])
   @@index([userId])
-  @@index([status])
 }
+
+// =====================
+// AUDIT LOG
+// =====================
 
 model AuditLog {
   id     String  @id @default(uuid())
@@ -393,7 +424,7 @@ model AuditLog {
   user   User?   @relation(fields: [userId], references: [id])
 
   action   AuditAction
-  entity   String // "Order", "Product", "Refund"
+  entity   String
   entityId String
   metadata Json?
 

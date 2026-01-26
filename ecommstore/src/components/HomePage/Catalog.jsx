@@ -1,7 +1,8 @@
-'use client';
-import { useRef, useState } from "react";
+"use client";
+import { useEffect, useRef, useState } from "react";
 import Products from "./Products";
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import Image from "next/image";
 
 const Catalog = ({ products, categories }) => {
   const [filteredProducts, setFilteredProducts] = useState(products);
@@ -20,7 +21,7 @@ const Catalog = ({ products, categories }) => {
     });
   };
 
- const handleCategoryClick = (categoryId) => {
+  const handleCategoryClick = (categoryId) => {
     const find = products.filter((p) => categoryId === p.categoryId);
     if (find.length > 0) {
       return {
@@ -33,37 +34,44 @@ const Catalog = ({ products, categories }) => {
         isEmpty: setIsEmpty(true),
       };
     }
- }
- console.log("filteredProducts:", filteredProducts);
+  };
+  useEffect(() => {
+    if (products.length === 0) return setIsEmpty(true); 
+  }, [products]);
+  console.log("filteredProducts:", filteredProducts);
   return (
     <section className="mx-4 border border-(--border-default) rounded-xl pt-8 md:pt-12 mb-6">
-
       {/* Header */}
       <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between border-b border-(--border-default) px-4 sm:px-6 md:px-10 pb-6">
-
         {/* Left */}
         <div>
-          <span className="inline-block text-(--color-brand-primary) text-[10px]
+          <span
+            className="inline-block text-(--color-brand-primary) text-[10px]
                            border-2 border-(--border-primary)
-                           rounded-full px-3 py-1">
+                           rounded-full px-3 py-1"
+          >
             EXCLUSIVE PRODUCTS
           </span>
 
-          <h2 className="text-2xl sm:text-3xl md:text-2xl lg:text-3xl
-                         font-semibold leading-tight text-(--text-heading) mt-3">
+          <h2
+            className="text-2xl sm:text-3xl md:text-2xl lg:text-3xl
+                         font-semibold leading-tight text-(--text-heading) mt-3"
+          >
             Our Featured Products
           </h2>
         </div>
 
         {/* Categories Slider */}
         <div className="relative flex items-center gap-2">
-
           {/* Left Arrow */}
           <button
             onClick={() => handleScroll("left")}
             className="hidden md:flex"
           >
-            <ChevronLeft size={24} className="bg-(--bg-primary) text-(--text-inverse) rounded-full" />
+            <ChevronLeft
+              size={24}
+              className="bg-(--bg-primary) text-(--text-inverse) rounded-full"
+            />
           </button>
 
           {/* Scroll Container */}
@@ -100,13 +108,23 @@ const Catalog = ({ products, categories }) => {
             onClick={() => handleScroll("right")}
             className="hidden md:flex"
           >
-            <ChevronRight size={24} className="bg-(--bg-primary) text-(--text-inverse) rounded-full" />
+            <ChevronRight
+              size={24}
+              className="bg-(--bg-primary) text-(--text-inverse) rounded-full"
+            />
           </button>
-
         </div>
       </div>
-
-      <Products products={filteredProducts} isEmpty={isEmpty} />
+      {isEmpty ? (
+        <div className="flex flex-col justify-center items-center min-h-fit py-5 font-semibold">
+          <Image loading="lazy" src="/empty.png" alt="empty" width={200} height={200} />
+          <h2 className="text-2xl font-semibold">
+            Oops! There are no products added yet. 
+          </h2>
+        </div>
+      ) : (
+        <Products products={filteredProducts} isEmpty={isEmpty} />
+      )}
     </section>
   );
 };

@@ -5,170 +5,164 @@ import Decimal from "decimal.js";
  * Get user's cart with full details
  * GET /api/cart
  */
+
 const getCart = async (req, res) => {
-    const userId = req.user?.id;
+  const userId = req.user.id;
 
-    try {
-        // Get or create cart for user
-        let cart = await prisma.cart.findUnique({
-            where: { userId },
-            include: {
-                items: {
-                    include: {
-                        product: {
-                            include: {
-                                images: {
-                                    where: { isMain: true },
-                                    take: 1,
-                                },
-                                category: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        slug: true,
-                                    },
-                                },
-                                inventory: true,
-                            },
-                        },
-                        productVariant: {
-                            include: {
-                                product: {
-                                    include: {
-                                        images: {
-                                            where: { isMain: true },
-                                            take: 1,
-                                        },
-                                        category: {
-                                            select: {
-                                                id: true,
-                                                name: true,
-                                                slug: true,
-                                            },
-                                        },
-                                    },
-                                },
-                                inventory: true,
-                            },
-                        },
+  try {
+    let cart = await prisma.cart.findFirst({
+      where: {
+        userId,
+        status: "ACTIVE",
+      },
+      include: {
+        items: {
+          include: {
+            variant: {
+              include: {
+                product: {
+                  include: {
+                    images: {
+                      where: { isMain: true },
+                      take: 1,
                     },
-                    orderBy: { createdAt: "desc" },
+                    category: {
+                      select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                      },
+                    },
+                  },
                 },
+                inventory: true,
+              },
             },
-        });
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
 
-        // Create cart if doesn't exist
-        if (!cart) {
-            cart = await prisma.cart.create({
-                data: { userId, status: "ACTIVE" },
-                include: { items: true },
-            });
-        }
-
-        // Calculate cart totals and validate items
-        let subtotal = new Decimal(0);
-        const enrichedItems = [];
-        const itemsWithIssues = [];
-
-        for (const item of cart.items) {
-            const variant = item.productVariant;
-            const product = variant?.product ?? item.product;
-
-            // Check for issues
-            const issues = [];
-
-            if (!variant || variant.deletedAt) {
-                issues.push("Product variant no longer available");
-            }
-
-            if (!product || !product.isActive || product.deletedAt) {
-                issues.push("Product is no longer available");
-            }
-
-            const availableStock =
-                variant?.inventory?.quantity ??
-                item.product?.inventory?.quantity ??
-                0;
-
-            if (availableStock < item.quantity) {
-                issues.push(
-                    `Only ${availableStock} items available (you have ${item.quantity} in cart)`
-                );
-            }
-
-            if (issues.length > 0) {
-                itemsWithIssues.push({
-                    itemId: item.id,
-                    productId: item.productId,
-                    variantId: item.productVariantId,
-                    name: product?.name || "Unknown Product",
-                    availableStock,
-                    issues,
-                });
-            }
-
-            // Calculate item total
-            const itemPrice = variant?.price
-                ? new Decimal(variant.price)
-                : product?.price
-                  ? new Decimal(product.price)
-                  : new Decimal(0);
-
-            const itemTotal = itemPrice.times(item.quantity);
-
-            enrichedItems.push({
-                id: item.id,
-                cartId: item.cartId,
-                productId: item.productId,
-                variantId: item.productVariantId,
-                quantity: item.quantity,
-
-                name: product?.name ?? "Unknown Product",
-                slug: product?.slug ?? "unknown-product",
-                category: product?.category,
-
-                price: itemPrice.toFixed(2),
-                itemTotal: itemTotal.toFixed(2),
-
-                availableStock,
-                hasIssues: issues.length > 0,
-                issues,
-
-                createdAt: item.createdAt,
-                updatedAt: item.updatedAt,
-            });
-
-            if (issues.length === 0) {
-                subtotal = subtotal.plus(itemTotal);
-            }
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                cart: {
-                    id: cart.id,
-                    status: cart.status,
-                    createdAt: cart.createdAt,
-                    updatedAt: cart.updatedAt,
-                },
-                items: enrichedItems,
-                summary: {
-                    itemCount: cart.items.length,
-                    validItemCount: cart.items.length - itemsWithIssues.length,
-                    subtotal: subtotal.toFixed(2),
-                },
-                issues:
-                    itemsWithIssues.length > 0 ? itemsWithIssues : undefined,
-            },
-        });
-    } catch (error) {
-        console.error("Get cart error:", error);
-        return res.status(500).json({
-            success: false,
-            error: "Internal Server Error",
-        });
+    // Auto-create cart
+    if (!cart) {
+      cart = await prisma.cart.create({
+        data: { userId },
+        include: { items: [] },
+      });
     }
+
+    let subtotal = new Decimal(0);
+    const enrichedItems = [];
+    const itemsWithIssues = [];
+
+    for (const item of cart.items) {
+      const variant = item.variant;
+      const product = variant?.product;
+
+      const issues = [];
+
+      // Product / variant validity
+      if (!variant || variant.deletedAt) {
+        issues.push("Product variant no longer available");
+      }
+
+      if (!product || !product.isActive || product.deletedAt) {
+        issues.push("Product is no longer available");
+      }
+
+      // Stock calculation (respect reservations)
+      const inventory = variant?.inventory;
+      const availableStock = inventory
+        ? Math.max(inventory.quantity - inventory.reserved, 0)
+        : 0;
+
+      if (item.quantity > availableStock) {
+        issues.push(
+          `Only ${availableStock} items available (you have ${item.quantity})`
+        );
+      }
+
+      if (issues.length > 0) {
+        itemsWithIssues.push({
+          itemId: item.id,
+          variantId: item.variantId,
+          name: item.name,
+          availableStock,
+          issues,
+        });
+      }
+
+      // Use SNAPSHOT price
+      const itemPrice = new Decimal(item.price);
+      const itemTotal = itemPrice.times(item.quantity);
+
+      if (issues.length === 0) {
+        subtotal = subtotal.plus(itemTotal);
+      }
+
+      enrichedItems.push({
+        id: item.id,
+        variantId: item.variantId,
+
+        name: item.name,
+        description: item.description,
+        sku: item.sku,
+
+        quantity: item.quantity,
+        price: itemPrice.toFixed(2),
+        itemTotal: itemTotal.toFixed(2),
+        thumbnail: product?.images?.find((i) => i.isMain)?.url ?? null,
+        images: product?.images?.map((i) => i.url) ?? null,
+        category: product?.category.name ?? null,
+        product: {
+          id: product?.id,
+          slug: product?.slug,
+          category: product?.category,
+        },
+
+        availableStock,
+        hasIssues: issues.length > 0,
+        issues,
+
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        cart: {
+          id: cart.id,
+          status: cart.status,
+          createdAt: cart.createdAt,
+          updatedAt: cart.updatedAt,
+        },
+        items: enrichedItems,
+        summary: {
+          itemCount: cart.items.length,
+          validItemCount:
+            cart.items.length - itemsWithIssues.length,
+          totalQuantity: cart.items.reduce(
+            (sum, i) => sum + i.quantity,
+            0
+          ),
+          subtotal: subtotal.toFixed(2),
+        },
+        issues:
+          itemsWithIssues.length > 0
+            ? itemsWithIssues
+            : undefined,
+      },
+    });
+  } catch (error) {
+    console.error("Get cart error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 };
 
 /**
@@ -176,168 +170,112 @@ const getCart = async (req, res) => {
  * POST /api/cart/items
  */
 const addToCart = async (req, res) => {
-    const userId = req.user?.id;
-    const { productId, variantId, quantity = 1 } = req.body;
+  const userId = req.user.id;
+  const { variantId, quantity = 1 } = req.body;
 
-    // ✅ Correct validation
-    if (!productId && !variantId) {
-        return res.status(400).json({
-            success: false,
-            error: "Either productId or variantId is required",
+  if (!variantId) {
+    return res.status(400).json({
+      success: false,
+      error: "variantId is required",
+    });
+  }
+
+  if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) {
+    return res.status(400).json({
+      success: false,
+      error: "Quantity must be between 1 and 99",
+    });
+  }
+
+  try {
+    const cartItem = await prisma.$transaction(async (tx) => {
+      // 1️⃣ Get or create active cart
+      let cart = await tx.cart.findFirst({
+        where: { userId, status: "ACTIVE" },
+      });
+
+      if (!cart) {
+        cart = await tx.cart.create({
+          data: { userId },
         });
-    }
+      }
 
-    if (productId && variantId) {
-        return res.status(400).json({
-            success: false,
-            error: "Only one of productId or variantId is allowed",
-        });
-    }
+      // 2️⃣ Fetch variant + inventory + product
+      const variant = await tx.productVariant.findUnique({
+        where: { id: variantId },
+        include: {
+          inventory: true,
+          product: true,
+        },
+      });
 
-    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 99) {
-        return res.status(400).json({
-            success: false,
-            error: "Quantity must be between 1 and 99",
-        });
-    }
+      if (!variant || variant.deletedAt) {
+        throw new Error("Product variant not found");
+      }
 
-    try {
-        const result = await prisma.$transaction(async (tx) => {
-            // 1️⃣ Get or create cart
-            let cart = await tx.cart.findUnique({
-                where: { userId },
-                include: { items: true },
-            });
+      if (!variant.product.isActive || variant.product.deletedAt) {
+        throw new Error("Product is no longer available");
+      }
 
-            if (!cart) {
-                cart = await tx.cart.create({
-                    data: { userId, status: "ACTIVE" },
-                });
-            }
+      const available =
+        (variant.inventory?.quantity ?? 0) -
+        (variant.inventory?.reserved ?? 0);
 
-            if (cart.status !== "ACTIVE") {
-                throw new Error("Cannot modify a checked-out cart");
-            }
+      // 3️⃣ Check existing cart item
+      const existing = await tx.cartItem.findUnique({
+        where: {
+          cartId_variantId: {
+            cartId: cart.id,
+            variantId,
+          },
+        },
+      });
 
-            let stock = 0;
-            let price;
-            let name;
-            let sku = null;
+      const totalQty = (existing?.quantity ?? 0) + quantity;
 
-            // 2️⃣ Variant product
-            if (variantId) {
-                const variant = await tx.productVariant.findUnique({
-                    where: { id: variantId },
-                    include: {
-                        inventory: true,
-                        product: true,
-                    },
-                });
+      if (totalQty > available) {
+        throw new Error(
+          `Insufficient stock. Available: ${available}`
+        );
+      }
 
-                if (!variant || variant.deletedAt) {
-                    throw new Error("Product variant not found");
-                }
+      // 4️⃣ Upsert cart item
+      return tx.cartItem.upsert({
+        where: {
+          cartId_variantId: {
+            cartId: cart.id,
+            variantId,
+          },
+        },
+        update: {
+          quantity: { increment: quantity },
+          price: variant.price,
+          name: variant.product.name,
+          sku: variant.sku,
+        },
+        create: {
+          cartId: cart.id,
+          variantId,
+          quantity,
+          price: variant.price,
+          name: variant.product.name,
+          sku: variant.sku,
+        },
+      });
+    });
 
-                if (!variant.product.isActive || variant.product.deletedAt) {
-                    throw new Error("Product is no longer available");
-                }
-
-                stock = variant.inventory?.quantity ?? 0;
-                price = variant.price;
-                name = variant.product.name;
-                sku = variant.sku;
-
-                const existing = await tx.cartItem.findUnique({
-                    where: {
-                        cartId_variantId: { cartId: cart.id, variantId },
-                    },
-                });
-
-                const totalQty = (existing?.quantity ?? 0) + quantity;
-                if (totalQty > stock) {
-                    throw new Error(`Insufficient stock. Available: ${stock}`);
-                }
-
-                return tx.cartItem.upsert({
-                    where: {
-                        cartId_variantId: { cartId: cart.id, variantId },
-                    },
-                    update: {
-                        quantity: { increment: quantity },
-                        price,
-                        name,
-                        sku,
-                        userId,
-                    },
-                    create: {
-                        cartId: cart.id,
-                        variantId,
-                        quantity,
-                        price,
-                        name,
-                        sku,
-                        userId,
-                    },
-                });
-            }
-
-            // 3️⃣ Simple product
-            const product = await tx.product.findUnique({
-                where: { id: productId },
-                include: { inventory: true },
-            });
-
-            if (!product || product.deletedAt || !product.isActive) {
-                throw new Error("Product not available");
-            }
-
-            stock = product.inventory?.quantity ?? 0;
-            price = product.price;
-            name = product.name;
-
-            const existing = await tx.cartItem.findFirst({
-                where: { cartId: cart.id, productId },
-            });
-
-            const totalQty = (existing?.quantity ?? 0) + quantity;
-            if (totalQty > stock) {
-                throw new Error(`Insufficient stock. Available: ${stock}`);
-            }
-
-            return tx.cartItem.upsert({
-                where: {
-                    cartId_productId: { cartId: cart.id, productId },
-                },
-                update: {
-                    quantity: { increment: quantity },
-                    price,
-                    name,
-                    userId,
-                },
-                create: {
-                    cartId: cart.id,
-                    productId,
-                    quantity,
-                    price,
-                    name,
-                    userId,
-                },
-            });
-        });
-
-        res.status(200).json({
-            success: true,
-            message: "Item added to cart",
-            data: result,
-        });
-    } catch (error) {
-        console.error("Add to cart error:", error);
-        console.log(error);
-        return res.status(400).json({
-            success: false,
-            error: error.message || "Failed to add item to cart",
-        });
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Item added to cart",
+      data: cartItem,
+    });
+  } catch (error) {
+    console.error("Add to cart error:", error);
+    return res.status(400).json({
+      success: false,
+      error: error.message || "Failed to add item to cart",
+    });
+  }
 };
 
 /**
@@ -345,107 +283,80 @@ const addToCart = async (req, res) => {
  * PATCH /api/cart/items/:itemId
  */
 const updateCartItem = async (req, res) => {
-    const { itemId } = req.params;
-    const { quantity } = req.body;
-    const userId = req.user?.id;
+  const { itemId } = req.params;
+  const { quantity } = req.body;
+  const userId = req.user.id;
 
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
-        return res.status(400).json({
-            success: false,
-            error: "Quantity must be between 1 and 99",
-        });
-    }
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+    return res.status(400).json({
+      success: false,
+      error: "Quantity must be between 1 and 99",
+    });
+  }
 
-    try {
-        const updatedItem = await prisma.$transaction(async (tx) => {
-            const item = await tx.cartItem.findFirst({
-                where: { id: itemId, userId },
-                include: {
-                    cart: true,
-                    product: {
-                        include: { inventory: true },
-                    },
-                    productVariant: {
-                        include: {
-                            inventory: true,
-                            product: true,
-                        },
-                    },
-                },
-            });
+  try {
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const item = await tx.cartItem.findFirst({
+        where: {
+          id: itemId,
+          cart: {
+            userId,
+            status: "ACTIVE",
+          },
+        },
+        include: {
+          variant: {
+            include: {
+              inventory: true,
+              product: true,
+            },
+          },
+        },
+      });
 
-            if (!item) throw new Error("Cart item not found");
-            if (item.cart.status !== "ACTIVE") {
-                throw new Error("Cannot modify a checked-out cart");
-            }
+      if (!item) {
+        throw new Error("Cart item not found or cart not active");
+      }
 
-            // 🚨 Defensive check — cart item must be simple OR variant
-            const isSimple = !!item.productId;
-            const isVariant = !!item.productVariantId;
+      const variant = item.variant;
+      const product = variant.product;
 
-            if (isSimple === isVariant) {
-                throw new Error("Invalid cart item state");
-            }
+      if (
+        variant.deletedAt ||
+        product.deletedAt ||
+        !product.isActive
+      ) {
+        throw new Error("Product is no longer available");
+      }
 
-            let stock;
-            let price;
+      const stock = variant.inventory?.quantity ?? 0;
 
-            // 🔁 Variant product
-            if (isVariant) {
-                const variant = item.productVariant;
+      if (quantity > stock) {
+        throw new Error(`Insufficient stock. Available: ${stock}`);
+      }
 
-                if (
-                    !variant ||
-                    variant.deletedAt ||
-                    !variant.product.isActive ||
-                    variant.product.deletedAt
-                ) {
-                    throw new Error("Product is no longer available");
-                }
+      return tx.cartItem.update({
+        where: { id: item.id },
+        data: {
+          quantity,
+          price: variant.price, // explicit resync
+        },
+      });
+    });
 
-                stock = variant.inventory?.quantity ?? 0;
-                price = variant.price;
-            }
+    return res.status(200).json({
+      success: true,
+      message: "Cart item updated successfully",
+      data: updatedItem,
+    });
+  } catch (error) {
+    console.error("Update cart item error:", error);
 
-            // 🔁 Simple product
-            if (isSimple) {
-                const product = item.product;
-
-                if (!product || product.deletedAt || !product.isActive) {
-                    throw new Error("Product is no longer available");
-                }
-
-                stock = product.inventory?.quantity ?? 0;
-                price = product.price;
-            }
-
-            if (quantity > stock) {
-                throw new Error(`Insufficient stock. Available: ${stock}`);
-            }
-
-            return tx.cartItem.update({
-                where: { id: item.id },
-                data: {
-                    quantity,
-                    price, // re-sync price on update
-                },
-            });
-        });
-
-        return res.status(200).json({
-            success: true,
-            message: "Cart item updated successfully",
-            data: updatedItem,
-        });
-    } catch (error) {
-        console.error("Update cart item error:", error);
-        console.log(error);
-
-        return res.status(400).json({
-            success: false,
-            error: error.message || "Failed to update cart item",
-        });
-    }
+    return res.status(400).json({
+      success: false,
+      error: error.message || "Failed to update cart item",
+    });
+  }
 };
 
 /**
@@ -549,241 +460,245 @@ const clearCart = async (req, res) => {
  * POST /api/cart/merge
  */
 const mergeCart = async (req, res) => {
-    const userId = req.user?.id;
-    const { items } = req.body;
+  const userId = req.user.id;
+  const { items } = req.body;
 
-    if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({
-            success: false,
-            error: "Guest cart is empty or invalid",
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: "Guest cart is empty or invalid",
+    });
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1️⃣ Get or create ACTIVE cart
+      let cart = await tx.cart.findFirst({
+        where: { userId, status: "ACTIVE" },
+      });
+
+      if (!cart) {
+        cart = await tx.cart.create({
+          data: { userId, status: "ACTIVE" },
         });
-    }
+      }
 
-    try {
-        const result = await prisma.$transaction(async (tx) => {
-            // Get or create user cart
-            let cart = await tx.cart.findUnique({
-                where: { userId },
-                include: { items: true },
-            });
+      const mergedItems = [];
+      const skippedItems = [];
 
-            if (!cart) {
-                cart = await tx.cart.create({
-                    data: { userId, status: "ACTIVE" },
-                    include: { items: true },
-                });
-            }
+      // 2️⃣ Process each guest item
+      for (const guestItem of items) {
+        const { productVariantId, quantity } = guestItem;
 
-            if (cart.status !== "ACTIVE") {
-                throw new Error("Cannot merge into a checked-out cart");
-            }
-
-            const mergedItems = [];
-            const skippedItems = [];
-
-            // Process each guest cart item
-            for (const guestItem of items) {
-                const { variantId, quantity } = guestItem;
-
-                if (!variantId || !quantity || quantity <= 0) {
-                    skippedItems.push({
-                        variantId,
-                        reason: "Invalid item data",
-                    });
-                    continue;
-                }
-
-                try {
-                    // Validate variant
-                    const variant = await tx.productVariant.findUnique({
-                        where: { id: variantId },
-                        include: {
-                            inventory: true,
-                            product: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    isActive: true,
-                                    deletedAt: true,
-                                    price: true,
-                                },
-                            },
-                        },
-                    });
-
-                    if (
-                        !variant ||
-                        variant.deletedAt ||
-                        !variant.product.isActive ||
-                        variant.product.deletedAt
-                    ) {
-                        skippedItems.push({
-                            variantId,
-                            reason: "Product no longer available",
-                        });
-                        continue;
-                    }
-
-                    const availableStock = variant.inventory?.quantity || 0;
-
-                    // Check existing cart item
-                    const existingItem = cart.items.find(
-                        (item) => item.variantId === variantId
-                    );
-
-                    const currentQuantity = existingItem?.quantity || 0;
-                    let finalQuantity = currentQuantity + quantity;
-
-                    // Clamp to available stock and max limit
-                    finalQuantity = Math.min(finalQuantity, availableStock, 99);
-
-                    if (finalQuantity <= 0) {
-                        skippedItems.push({
-                            variantId,
-                            name: variant.product.name,
-                            reason: "Out of stock",
-                        });
-                        continue;
-                    }
-
-                    // Upsert cart item
-                    const cartItem = await tx.cartItem.upsert({
-                        where: {
-                            cartId_variantId: {
-                                cartId: cart.id,
-                                variantId,
-                            },
-                        },
-                        update: {
-                            quantity: finalQuantity,
-                            price: variant.price,
-                            name: variant.product.name,
-                            sku: variant.sku,
-                        },
-                        create: {
-                            cartId: cart.id,
-                            userId,
-                            variantId,
-                            quantity: finalQuantity,
-                            price: variant.price,
-                            name: variant.product.name,
-                            sku: variant.sku,
-                        },
-                    });
-
-                    mergedItems.push({
-                        variantId,
-                        name: variant.product.name,
-                        quantity: finalQuantity,
-                        adjusted: finalQuantity !== currentQuantity + quantity,
-                    });
-                } catch (itemError) {
-                    console.error(
-                        `Error processing item ${variantId}:`,
-                        itemError
-                    );
-                    skippedItems.push({
-                        variantId,
-                        reason: "Error processing item",
-                    });
-                }
-            }
-
-            return { mergedItems, skippedItems };
-        });
-
-        return res.status(200).json({
-            success: true,
-            message: "Cart merged successfully",
-            data: {
-                mergedCount: result.mergedItems.length,
-                skippedCount: result.skippedItems.length,
-                merged: result.mergedItems,
-                skipped:
-                    result.skippedItems.length > 0
-                        ? result.skippedItems
-                        : undefined,
-            },
-        });
-    } catch (error) {
-        console.error("Merge cart error:", error);
-
-        if (error.message === "Cannot merge into a checked-out cart") {
-            return res.status(400).json({
-                success: false,
-                error: error.message,
-            });
+        if (
+          !productVariantId ||
+          !Number.isInteger(quantity) ||
+          quantity <= 0
+        ) {
+          skippedItems.push({
+            productVariantId,
+            reason: "Invalid item data",
+          });
+          continue;
         }
 
-        return res.status(500).json({
-            success: false,
-            error: "Internal Server Error",
-        });
-    }
+        try {
+          // 3️⃣ Validate variant
+          const variant = await tx.productVariant.findUnique({
+            where: { id: productVariantId },
+            include: {
+              inventory: true,
+              product: {
+                select: {
+                  name: true,
+                  isActive: true,
+                  deletedAt: true,
+                },
+              },
+            },
+          });
+
+          if (
+            !variant ||
+            variant.deletedAt ||
+            !variant.product.isActive ||
+            variant.product.deletedAt
+          ) {
+            skippedItems.push({
+              productVariantId,
+              reason: "Product no longer available",
+            });
+            continue;
+          }
+
+          const availableStock = variant.inventory?.quantity ?? 0;
+
+          if (availableStock <= 0) {
+            skippedItems.push({
+              productVariantId,
+              name: variant.product.name,
+              reason: "Out of stock",
+            });
+            continue;
+          }
+
+          // 4️⃣ Get existing cart item (SAFE way)
+          const existingItem = await tx.cartItem.findUnique({
+            where: {
+              cartId_productVariantId: {
+                cartId: cart.id,
+                productVariantId,
+              },
+            },
+          });
+
+          const currentQuantity = existingItem?.quantity ?? 0;
+
+          let finalQuantity = Math.min(
+            currentQuantity + quantity,
+            availableStock,
+            99
+          );
+
+          if (finalQuantity <= 0) {
+            skippedItems.push({
+              productVariantId,
+              name: variant.product.name,
+              reason: "Insufficient stock",
+            });
+            continue;
+          }
+
+          // 5️⃣ Upsert cart item
+          await tx.cartItem.upsert({
+            where: {
+              cartId_productVariantId: {
+                cartId: cart.id,
+                productVariantId,
+              },
+            },
+            update: {
+              quantity: finalQuantity,
+              price: variant.price, // explicit resync
+              name: variant.product.name,
+              sku: variant.sku,
+            },
+            create: {
+              cartId: cart.id,
+              productVariantId,
+              quantity: finalQuantity,
+              price: variant.price,
+              name: variant.product.name,
+              sku: variant.sku,
+            },
+          });
+
+          mergedItems.push({
+            productVariantId,
+            name: variant.product.name,
+            quantity: finalQuantity,
+            adjusted: finalQuantity !== currentQuantity + quantity,
+          });
+        } catch (itemError) {
+          console.error(
+            `Error processing variant ${productVariantId}:`,
+            itemError
+          );
+          skippedItems.push({
+            productVariantId,
+            reason: "Error processing item",
+          });
+        }
+      }
+
+      return { mergedItems, skippedItems };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Cart merged successfully",
+      data: {
+        mergedCount: result.mergedItems.length,
+        skippedCount: result.skippedItems.length,
+        merged: result.mergedItems,
+        skipped:
+          result.skippedItems.length > 0
+            ? result.skippedItems
+            : undefined,
+      },
+    });
+  } catch (error) {
+    console.error("Merge cart error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 };
 
 /**
  * Get cart summary (lightweight endpoint)
  * GET /api/cart/summary
  */
+
 const getCartSummary = async (req, res) => {
-    const userId = req.user?.id;
+  const userId = req.user.id;
 
-    try {
-        const cart = await prisma.cart.findUnique({
-            where: { userId },
-            include: {
-                items: {
-                    include: {
-                        productVariant: {
-                            select: {
-                                price: true,
-                            },
-                        },
-                    },
-                },
-            },
-        });
+  try {
+    const cart = await prisma.cart.findFirst({
+      where: {
+        userId,
+        status: "ACTIVE",
+      },
+      include: {
+        items: {
+          select: {
+            quantity: true,
+            price: true,
+          },
+        },
+      },
+    });
 
-        if (!cart) {
-            return res.status(200).json({
-                success: true,
-                data: {
-                    itemCount: 0,
-                    subtotal: "0.00",
-                },
-            });
-        }
-
-        let subtotal = new Decimal(0);
-        let itemCount = 0;
-
-        for (const item of cart.items) {
-            if (item.productVariant?.price) {
-                const itemTotal = new Decimal(item.productVariant.price).times(
-                    item.quantity
-                );
-                subtotal = subtotal.plus(itemTotal);
-                itemCount += item.quantity;
-            }
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                itemCount: cart.items.length,
-                totalQuantity: itemCount,
-                subtotal: subtotal.toFixed(2),
-                status: cart.status,
-            },
-        });
-    } catch (error) {
-        console.error("Get cart summary error:", error);
-        return res.status(500).json({
-            success: false,
-            error: "Internal Server Error",
-        });
+    if (!cart || cart.items.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          itemCount: 0,        // distinct items
+          totalQuantity: 0,    // sum of quantities
+          subtotal: "0.00",
+          status: "ACTIVE",
+        },
+      });
     }
+
+    let subtotal = new Decimal(0);
+    let totalQuantity = 0;
+
+    for (const item of cart.items) {
+      subtotal = subtotal.plus(
+        new Decimal(item.price).times(item.quantity)
+      );
+      totalQuantity += item.quantity;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        itemCount: cart.items.length,
+        totalQuantity,
+        subtotal: subtotal.toFixed(2),
+        status: cart.status,
+      },
+    });
+  } catch (error) {
+    console.error("Get cart summary error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 };
 
 export {

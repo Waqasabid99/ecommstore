@@ -6,6 +6,9 @@ import { Country, State, City }  from 'country-state-city';
 import useCartStore from '@/store/useCartStore';
 import Select from 'react-select';
 import { getStatesOfCountry } from 'country-state-city/lib/state';
+import { baseUrl } from '@/lib/utils';
+import Image from 'next/image';
+import Link from 'next/link';
 
 const Checkout = () => {
   const [step, setStep] = useState(1); // 1: shipping, 2: payment, 3: confirmation
@@ -35,7 +38,7 @@ const Checkout = () => {
     postalCode: ''
   });
   
-  console.log(hasAccount)
+  console.log(user)
   const [billingInfo, setBillingInfo] = useState({
     cardNumber: '',
     cardName: '',
@@ -141,10 +144,10 @@ const Checkout = () => {
       {/* Header */}
       <section className="bg-linear-to-br from-blue-50 to-purple-50 mx-4 rounded-xl px-6 py-12 md:py-16 mb-6">
         <div className="max-w-7xl mx-auto">
-          <button className="text-(--text-secondary) hover:text-(--text-hover) font-medium flex items-center gap-2 mb-4">
+          <Link href={'/cart'} className="text-(--text-secondary) hover:text-(--text-hover) font-medium flex items-center gap-2 mb-4">
             <ArrowLeft size={18} />
             <span>Back to Cart</span>
-          </button>
+          </Link>
           
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
@@ -594,8 +597,10 @@ const Checkout = () => {
                   {orderItems.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-16 h-16 bg-(--bg-surface) rounded-lg overflow-hidden shrink-0">
-                        <img
-                          src={item.thumbnail}
+                        <Image
+                          src={`${item.thumbnail}` || '/placeholder.png'}
+                          width={100}
+                          height={100}
                           alt={item.name}
                           className="w-full h-full object-cover"
                         />

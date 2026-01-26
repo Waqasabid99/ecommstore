@@ -11,10 +11,11 @@ const page = async () => {
   const fetchedproducts = await getProducts();
   const fetchedcategories = await getCategories();
   const products = fetchedproducts.data;
+  const pagination = fetchedproducts.pagination;
   const categories = fetchedcategories.data;
   return (
     <main>
-      <ShopPage products={products} categories={categories}/>
+      <ShopPage products={products} categories={categories} pagination={pagination}/>
     </main>
   )
 }

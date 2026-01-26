@@ -5,7 +5,7 @@ const cartRouter = express.Router();
 
 cartRouter.get("/", verifyUser, getCart);
 cartRouter.post("/add-to-cart", verifyUser, addToCart);
-cartRouter.patch("/update-item/:id", verifyUser, updateCartItem);
+cartRouter.patch("/update-item/:itemId", verifyUser, updateCartItem);
 cartRouter.delete("/remove-item/:id", verifyUser, removeCartItem);
 cartRouter.delete("/clear-cart", verifyUser, clearCart);
 cartRouter.post("/merge", verifyUser, mergeCart);

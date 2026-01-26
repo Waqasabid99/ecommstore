@@ -228,7 +228,7 @@ const initiateCheckout = async (req, res) => {
 
                 // 10. Clear cart items (optional - keep for order history reference)
                 await tx.cartItem.deleteMany({
-                    where: { userId },
+                    where: { cartId: cartItems[0].cart.id },
                 });
 
                 // 11. Create audit log

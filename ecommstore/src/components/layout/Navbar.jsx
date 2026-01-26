@@ -21,9 +21,9 @@ import useAuth from "@/hooks/useAuth";
 import useAuthStore from "@/store/authStore";
 import { getCategories } from "@/lib/api/category";
 import useCartStore from "@/store/useCartStore";
-import { getProducts } from "@/lib/api/product";
 
 const Navbar = ({ products }) => {
+  console.log(products)
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openProfileDropDown, setOpenProfileDropDown] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -34,11 +34,9 @@ const Navbar = ({ products }) => {
 
   const { getCartItems, getCartSummary } = useCartStore();
   const cart = useCartStore((state) => state.cart);
-  console.log(cart);
   const { itemCount, subtotal } = getCartSummary();
 
   const cartItems = getCartItems();
-  console.log(cartItems)
   const navigate = useRouter();
   const pathname = usePathname();
   useEffect(() => {
@@ -194,16 +192,16 @@ const Navbar = ({ products }) => {
                     setIsCartOpen(!isCartOpen)
                     getCartItems();
                   }}
-                  className="flex items-center gap-2 sm:gap-3 md:border lg:border text-black px-3 sm:px-4 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all group"
+                  className="flex items-center border gap-2 sm:gap-3 md:border lg:border text-black px-3 sm:px-4 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all group"
                 >
                   <ShoppingCart
                     size={35}
                     className="bg-black p-2 text-white border rounded-full group-hover:scale-110 transition-transform"
                   />
-                  <div className="md:group-hover:text-(--text-inverse) lg:group-hover:text-(--text-inverse) hidden sm:flex flex-col items-start">
+                  <div className="md:group-hover:text-(--text-inverse) md:group-hover:border md:group-hover:border-(--border-default) lg:group-hover:text-(--text-inverse) hidden sm:group-hover:text-white sm:flex flex-col items-start">
                     <span className="text-xs opacity-80">Total</span>
                     <span className="text-sm font-semibold">
-                      Rs. {cartItems? subtotal : "0.00" || "0.00"}
+                      Rs. {subtotal ?? 0.00}
                     </span>
                   </div>
                 </button>
@@ -215,7 +213,7 @@ const Navbar = ({ products }) => {
                       className="fixed inset-0 bg-black/20 z-40"
                       onClick={() => setIsCartOpen(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-2xl border border-(--border-default) z-50 overflow-hidden">
+                    <div className="absolute -right-12 mt-2 w-72 lg:w-96 md:82 bg-white rounded-lg shadow-2xl border border-(--border-default) z-50 overflow-hidden">
                       <div className="bg-black text-white px-4 py-3">
                         <h3 className="font-semibold text-lg">Shopping Cart</h3>
                         <p className="text-sm opacity-80">
@@ -228,18 +226,18 @@ const Navbar = ({ products }) => {
                             key={item.id}
                             className="px-4 py-3 border-b border-(--border-default) hover:bg-gray-50 transition-colors"
                           >
-                            <Link href={`/shop/products/${item.slug}`}>
+                            <Link href={`/shop/products/${item?.product?.slug}`}>
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <h4 className="font-medium text-sm text-(--text-primary)">
                                   {item.name}
                                 </h4>
                                 <p className="text-xs text-(--text-secondary) mt-1">
-                                  Rs. {item.price}
+                                  Rs. {item?.price || "0.00"}
                                 </p>
                               </div>
                               <span className="text-sm font-semibold text-(--text-primary)">
-                                ×{item.quantity}
+                                ×{item?.quantity || "0"}
                               </span>
                             </div>
                             </Link>
@@ -252,7 +250,7 @@ const Navbar = ({ products }) => {
                             Total:
                           </span>
                           <span className="text-xl font-bold text-(--color-brand-primary)">
-                            Rs. {cartItems? subtotal : "0.00" || "0.00"}
+                            Rs. {subtotal ?? 0.00}
                           </span>
                         </div>
                         <Link href={'/cart'} className="w-full flex justify-center bg-black text-white py-3 rounded-full font-semibold hover:bg-(--btn-bg-hover) transition-colors">

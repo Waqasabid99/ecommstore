@@ -1,12 +1,13 @@
 import { baseUrl } from "@/lib/utils";
 import useCartStore from "@/store/useCartStore";
+import Image from "next/image";
 import Link from "next/link";
 
 const Cart = () => {
   const { getCartItems, getCartSummary, updateCartItem, removeCartItem } = useCartStore();
   const { itemCount, totalQuantity, subtotal } = getCartSummary();
   const cartItems = getCartItems();
-
+  console.log(cartItems)
     const updateQuantity = (itemId, currentQty, delta) => {
     const newQty = currentQty + delta;
     if (newQty < 1 || newQty > 99) return;
@@ -17,11 +18,6 @@ const Cart = () => {
   const removeItem = (itemId) => {
     removeCartItem(itemId);
   };
-
-    const mainImage =
-    cartItems.images?.find(img => img.isMain)?.url ||
-    cartItems.images?.[0]?.url ||
-    "/placeholder.png";
 
   return (
     <div className="absolute right-30 top-30 w-72 sm:w-80 bg-(--bg-page) rounded-lg shadow-lg border border-(--border-default) overflow-hidden z-50 transition-colors duration-300">
@@ -35,13 +31,15 @@ const Cart = () => {
       {/* Cart Items */}
       <div className="max-h-64 overflow-y-auto overflow-x-hidden">
         {itemCount?.length > 0 ? (
-          cartItems?.map((item) => (
+          cartItems?.map(({ product: item }) => (
             <div
               key={item.id}
               className="flex items-center px-1 py-2 border-b border-(--border-default)"
             >
-              <img
-                src={`${item.images ? `${baseUrl}${mainImage}` : '/placeholder.png' }`}
+              <Image
+                src={`${item.thumbnail}` || '/placeholder.png'}
+                width={40}
+                height={40}
                 alt={item.name}
                 className="w-10 h-10 object-cover rounded"
               />
@@ -51,10 +49,10 @@ const Cart = () => {
                 </p>
               </div>
               <div className="text-sm text-(--text-secondary) mr-2">
-                {item.quantity}
+                {cartItems?.map(({ quantity }) => quantity) || 0}
               </div>
               <button
-                onClick={() => removeFromCart(item.id)}
+                onClick={() => removeFromCart(cartItems?.[0].id)}
                 className="text-(--text-secondary) hover:text-red-500 transition-colors duration-200"
               >
                 ×

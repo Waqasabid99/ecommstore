@@ -136,12 +136,12 @@ model Address {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  fullName   String
+  fullName   String?
   phone      String
   line1      String
   line2      String?
   city       String
-  state      String
+  state      String?
   postalCode String
   country    String
 

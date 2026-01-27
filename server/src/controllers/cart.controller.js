@@ -376,7 +376,7 @@ const removeCartItem = async (req, res) => {
 
             if (!item) throw new Error("Cart item not found");
 
-            if (item.userId !== userId) {
+            if (item.cart.userId !== userId) {
                 throw new Error("Unauthorized cart access");
             }
 
@@ -488,15 +488,15 @@ const mergeCart = async (req, res) => {
 
       // 2️⃣ Process each guest item
       for (const guestItem of items) {
-        const { productVariantId, quantity } = guestItem;
+        const { variantId, quantity } = guestItem;
 
         if (
-          !productVariantId ||
+          !variantId ||
           !Number.isInteger(quantity) ||
           quantity <= 0
         ) {
           skippedItems.push({
-            productVariantId,
+            variantId,
             reason: "Invalid item data",
           });
           continue;
@@ -505,7 +505,7 @@ const mergeCart = async (req, res) => {
         try {
           // 3️⃣ Validate variant
           const variant = await tx.productVariant.findUnique({
-            where: { id: productVariantId },
+            where: { id: variantId },
             include: {
               inventory: true,
               product: {
@@ -525,7 +525,7 @@ const mergeCart = async (req, res) => {
             variant.product.deletedAt
           ) {
             skippedItems.push({
-              productVariantId,
+              variantId,
               reason: "Product no longer available",
             });
             continue;
@@ -535,7 +535,7 @@ const mergeCart = async (req, res) => {
 
           if (availableStock <= 0) {
             skippedItems.push({
-              productVariantId,
+              variantId,
               name: variant.product.name,
               reason: "Out of stock",
             });
@@ -547,7 +547,7 @@ const mergeCart = async (req, res) => {
             where: {
               cartId_productVariantId: {
                 cartId: cart.id,
-                productVariantId,
+                variantId,
               },
             },
           });
@@ -562,7 +562,7 @@ const mergeCart = async (req, res) => {
 
           if (finalQuantity <= 0) {
             skippedItems.push({
-              productVariantId,
+              variantId,
               name: variant.product.name,
               reason: "Insufficient stock",
             });
@@ -574,7 +574,7 @@ const mergeCart = async (req, res) => {
             where: {
               cartId_productVariantId: {
                 cartId: cart.id,
-                productVariantId,
+                variantId,
               },
             },
             update: {
@@ -585,7 +585,7 @@ const mergeCart = async (req, res) => {
             },
             create: {
               cartId: cart.id,
-              productVariantId,
+              variantId,
               quantity: finalQuantity,
               price: variant.price,
               name: variant.product.name,
@@ -594,18 +594,18 @@ const mergeCart = async (req, res) => {
           });
 
           mergedItems.push({
-            productVariantId,
+            variantId,
             name: variant.product.name,
             quantity: finalQuantity,
             adjusted: finalQuantity !== currentQuantity + quantity,
           });
         } catch (itemError) {
           console.error(
-            `Error processing variant ${productVariantId}:`,
+            `Error processing variant ${variantId}:`,
             itemError
           );
           skippedItems.push({
-            productVariantId,
+            variantId,
             reason: "Error processing item",
           });
         }

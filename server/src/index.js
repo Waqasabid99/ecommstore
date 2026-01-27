@@ -12,6 +12,7 @@ import cartRouter from "./routes/cart.routes.js";
 import checkoutRouter from "./routes/checkout.routes.js";
 import orderRouter from "./routes/order.routes.js";
 import couponRouter from "./routes/coupon.routes.js";
+import addressRouter from "./routes/address.routes.js";
 const app = express();
 const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
 
@@ -35,6 +36,7 @@ app.get("/", (req, res) => {
 });
 app.use("/auth", authRouter);
 app.use("/users", userRouter);
+app.use("/address", addressRouter);
 app.use("/products", productRouter);
 app.use("/categories", categoryRouter);
 app.use("/cart", cartRouter);

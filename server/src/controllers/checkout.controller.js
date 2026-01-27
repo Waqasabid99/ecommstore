@@ -3,7 +3,6 @@ import Decimal from "decimal.js";
 
 /**
  * Initiate checkout and create order
- * POST /api/checkout
  */
 const initiateCheckout = async (req, res) => {
     const userId = req.user?.id;
@@ -120,7 +119,7 @@ const initiateCheckout = async (req, res) => {
                 const orderItemsData = [];
 
                 for (const item of cartItems) {
-                    const itemPrice = new Decimal(item.productVariant.price);
+                    const itemPrice = new Decimal(item.price);
                     const itemTotal = itemPrice.times(item.quantity);
                     subtotal = subtotal.plus(itemTotal);
 
@@ -163,11 +162,23 @@ const initiateCheckout = async (req, res) => {
                     appliedCoupon = coupon;
 
                     // Increment coupon usage
-                    await tx.coupon.update({
-                        where: { id: coupon.id },
+                    const updated = await tx.coupon.updateMany({
+                        where: { 
+                            id: coupon.id,
+                            isActive: true,
+                            expiresAt: { gt: new Date() },
+                            OR: [
+                                { usageLimit: null },
+                                { usedCount: { lt: coupon.usageLimit } },
+                            ],
+                        },
                         data: { usedCount: { increment: 1 } },
                     });
-                }
+
+                    if (updated.count === 0) {
+                        throw new Error("Coupon usage limit reached");
+                    };
+                };
 
                 const totalAmount = subtotal.minus(discount);
 
@@ -210,13 +221,21 @@ const initiateCheckout = async (req, res) => {
 
                 // 8. Decrement inventory
                 for (const item of cartItems) {
-                    await tx.inventory.update({
-                        where: { variantId: item.variantId },
+                    const updated = await tx.inventory.updateMany({
+                        where: { 
+                            variantId: item.variantId,
+                            quantity: { gte: item.quantity },
+                        },
                         data: {
                             quantity: { decrement: item.quantity },
                         },
                     });
-                }
+                    if (updated.count === 0) {
+                        throw new Error(
+                            `Inventory changed during checkout for item: ${item.variantId}`
+                        );
+                    };
+                };
 
                 // 9. Mark cart as CHECKED_OUT
                 if (cartItems[0].cart) {
@@ -310,7 +329,6 @@ const initiateCheckout = async (req, res) => {
 
 /**
  * Validate cart before checkout (Optional pre-check endpoint)
- * POST /api/checkout/validate
  */
 const validateCheckout = async (req, res) => {
     const userId = req.user?.id;

@@ -11,6 +11,12 @@ import {
 // Register a new user
 const registerUser = async (req, res) => {
     const { name, email, password, role } = req?.body;
+    if (!name || !email || !password) {
+        return res.status(400).json({
+            success: false,
+            message: "Name, email and password fields are required",
+        });
+    }
     try {
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
@@ -53,8 +59,15 @@ const registerUser = async (req, res) => {
 // Login user
 const loginUser = async (req, res) => {
     const { email, password } = req?.body;
+    console.log(email, password)
     try {
         const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        };
         if (user) {
             const isPasswordValid = verifyPassword(password, user.password);
             if (!user || !isPasswordValid) {
@@ -62,8 +75,9 @@ const loginUser = async (req, res) => {
                     success: false,
                     message: "Invalid email or password",
                 });
-            }
-        }
+            };
+        };
+
         // Generate tokens
         const accessToken = generateToken(user);
         const rawRefreshToken = generateRefreshToken();

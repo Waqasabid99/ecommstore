@@ -198,7 +198,7 @@ const Navbar = ({ products }) => {
                     size={35}
                     className="bg-black p-2 text-white border rounded-full group-hover:scale-110 transition-transform"
                   />
-                  <div className="md:group-hover:text-(--text-inverse) md:group-hover:border md:group-hover:border-(--border-default) lg:group-hover:text-(--text-inverse) hidden sm:group-hover:text-white sm:flex flex-col items-start">
+                  <div className="md:group-hover:text-(--text-inverse) md:group-hover:border-(--border-default) lg:group-hover:text-(--text-inverse) hidden sm:group-hover:text-white sm:flex flex-col items-start">
                     <span className="text-xs opacity-80">Total</span>
                     <span className="text-sm font-semibold">
                       Rs. {subtotal ?? 0.00}

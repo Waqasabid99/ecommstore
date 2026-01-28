@@ -1,8 +1,14 @@
-// Utility functions
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge"
 import { PiCreditCard } from "react-icons/pi";
 import { BsShop } from "react-icons/bs";
 import { CiDiscount1 } from "react-icons/ci";
 import { PiGlobeThin } from "react-icons/pi";
+
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+// Utility functions
 
 export const formatPrice = (price) => {
   return new Intl.NumberFormat('en-US', {

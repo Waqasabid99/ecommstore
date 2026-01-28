@@ -28,13 +28,13 @@ const useAuthStore = create(
 
       // LOGIN
       login: async (formData) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, isAuthenticated: false });
         try {
           const { data } = await api.post("/auth/login", formData);
           console.log(data)
           if (data.success ) {
             const { user } = data;
-            set({ user, isAuthenticated: true });
+            set({ user, isAuthenticated: true, isLoading: false });
           }
 
           const cartStore = useCartStore.getState();
@@ -78,8 +78,11 @@ const useAuthStore = create(
           const { data } = await api.get("/auth/verify");
           set({ user: data.user, isLoading: false });
           return true;
-        } catch {
-          set({ user: null, isLoading: false });
+        } catch (err) {
+          // Only logout if refresh ALSO failed
+          if (err.response?.status === 401) {
+            set({ isLoading: false });
+          }
           return false;
         }
       },

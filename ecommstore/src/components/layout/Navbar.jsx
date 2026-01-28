@@ -21,6 +21,7 @@ import useAuth from "@/hooks/useAuth";
 import useAuthStore from "@/store/authStore";
 import { getCategories } from "@/lib/api/category";
 import useCartStore from "@/store/useCartStore";
+import { Skeleton } from "../ui/skeleton";
 
 const Navbar = ({ products }) => {
   console.log(products)

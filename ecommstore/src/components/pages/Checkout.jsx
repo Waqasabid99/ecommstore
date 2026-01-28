@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import {
   CreditCard,
   Truck,
@@ -39,20 +39,24 @@ const Checkout = () => {
   const [shippingAddressId, setShippingAddressId] = useState(null);
   const [billingAddressId, setBillingAddressId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { getCartItems, getCartSummary } = useCartStore();
+  const [orderId, setOrderId] = useState(null);
+  const { getCartItems, getCartSummary, initializeCart } = useCartStore();
   const { isAuthenticated, user } = useAuth();
   const { login, register, error: storeError, clearError } = useAuthStore();
 
   const { subtotal } = getCartSummary();
   const orderItems = getCartItems();
+
   const countryOptions = Country.getAllCountries().map((country) => ({
     value: country.isoCode,
     label: country.name,
   }));
+
   const states = stateOptions.map((state) => ({
     value: state.isoCode,
     label: state.name,
   }));
+
   const cities = cityOptions.map((city) => ({
     value: city.name,
     label: city.name,
@@ -273,11 +277,28 @@ const Checkout = () => {
     }
   };
 
-  const handlePlaceOrder = async(e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    
-    setStep(3);
-    window.scrollTo(0, 0);
+    setAuthError("");
+    setIsLoading(true);
+    try {
+      const { data } = await axios.post(`${baseUrl}/checkout`, { shippingAddressId, sameAsShipping }, { withCredentials: true});
+      console.log(data);
+      if (data.success) {
+        setIsLoading(false);
+        setOrderId(data.data.orderId);
+        setStep(3);
+        window.scrollTo(0, 0);
+        initializeCart();
+      } else {
+        setIsLoading(false);
+        setAuthError(data.error.message);
+      }
+    } catch (error) {
+      setIsLoading(false);
+      setAuthError(error.message);
+      console.log(error);
+    }
   };
 
   // Confirmation Screen
@@ -302,7 +323,7 @@ const Checkout = () => {
               <p className="text-(--text-secondary) mb-8">
                 Order #
                 <span className="font-semibold text-(--text-heading)">
-                  ORD-{Math.random().toString(36).substr(2, 9).toUpperCase()}
+                  ORD-{ orderId.substr(0, 8).toUpperCase() }
                 </span>
               </p>
 
@@ -1219,7 +1240,7 @@ const Checkout = () => {
                       onClick={handlePlaceOrder}
                       className="flex-1 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg"
                     >
-                      Place Order
+                      {isLoading ? <Loader size="sm" text="" /> : "Place Order"}
                     </button>
                   </div>
                 </div>
@@ -1227,6 +1248,7 @@ const Checkout = () => {
             </div>
 
             {/* Right Column - Order Summary */}
+            {orderItems?.length === 0 ? null : (
             <div className="lg:col-span-1">
               <div className="bg-white border border-(--border-default) rounded-xl p-6 sticky top-6">
                 <h3 className="text-xl font-bold mb-4 text-(--text-heading)">
@@ -1235,7 +1257,7 @@ const Checkout = () => {
 
                 {/* Items */}
                 <div className="space-y-4 mb-6 pb-6 border-b border-(--border-default)">
-                  {orderItems.map((item) => (
+                  {orderItems?.map((item) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="w-16 h-16 bg-(--bg-surface) rounded-lg overflow-hidden shrink-0">
                         <Image
@@ -1294,6 +1316,7 @@ const Checkout = () => {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
       </section>

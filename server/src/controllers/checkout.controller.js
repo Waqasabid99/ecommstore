@@ -24,25 +24,34 @@ const initiateCheckout = async (req, res) => {
         const result = await prisma.$transaction(
             async (tx) => {
                 // 1. Fetch user's cart items with full details
-                const cartItems = await tx.cartItem.findMany({
+                const cart = await tx.cart.findFirst({
                     where: {
                         userId,
-                        cart: { status: "ACTIVE" },
+                        status: "ACTIVE",
                     },
                     include: {
-                        productVariant: {
+                        items: {
                             include: {
-                                inventory: true,
-                                product: {
+                                variant: {
                                     include: {
-                                        images: true,
+                                        inventory: true,
+                                        product: {
+                                            include: {
+                                                images: true,
+                                            },
+                                        },
                                     },
                                 },
                             },
                         },
-                        cart: true,
                     },
                 });
+
+                if (!cart || cart.items.length === 0) {
+                    throw new Error("Cart is empty");
+                }
+
+                const cartItems = cart.items;
 
                 // 2. Validate cart is not empty
                 if (!cartItems || cartItems.length === 0) {
@@ -52,8 +61,8 @@ const initiateCheckout = async (req, res) => {
                 // 3. Validate inventory for all items
                 const inventoryIssues = [];
                 for (const item of cartItems) {
-                    const variant = item.productVariant;
-                    
+                    const variant = item.variant;
+
                     if (!variant || variant.deletedAt) {
                         inventoryIssues.push({
                             variantId: item.variantId,
@@ -158,12 +167,14 @@ const initiateCheckout = async (req, res) => {
                     }
 
                     // Calculate discount
-                    discount = subtotal.times(coupon.discountPct).dividedBy(100);
+                    discount = subtotal
+                        .times(coupon.discountPct)
+                        .dividedBy(100);
                     appliedCoupon = coupon;
 
                     // Increment coupon usage
                     const updated = await tx.coupon.updateMany({
-                        where: { 
+                        where: {
                             id: coupon.id,
                             isActive: true,
                             expiresAt: { gt: new Date() },
@@ -177,8 +188,8 @@ const initiateCheckout = async (req, res) => {
 
                     if (updated.count === 0) {
                         throw new Error("Coupon usage limit reached");
-                    };
-                };
+                    }
+                }
 
                 const totalAmount = subtotal.minus(discount);
 
@@ -222,7 +233,7 @@ const initiateCheckout = async (req, res) => {
                 // 8. Decrement inventory
                 for (const item of cartItems) {
                     const updated = await tx.inventory.updateMany({
-                        where: { 
+                        where: {
                             variantId: item.variantId,
                             quantity: { gte: item.quantity },
                         },
@@ -234,20 +245,20 @@ const initiateCheckout = async (req, res) => {
                         throw new Error(
                             `Inventory changed during checkout for item: ${item.variantId}`
                         );
-                    };
-                };
-
+                    }
+                }
+                console.log(cartItems[0].cart);
                 // 9. Mark cart as CHECKED_OUT
-                if (cartItems[0].cart) {
+                if (cartItems[0]) {
                     await tx.cart.update({
-                        where: { id: cartItems[0].cart.id },
+                        where: { id: cartItems[0].cartId },
                         data: { status: "CHECKED_OUT" },
                     });
                 }
 
                 // 10. Clear cart items (optional - keep for order history reference)
                 await tx.cartItem.deleteMany({
-                    where: { cartId: cartItems[0].cart.id },
+                    where: { cartId: cartItems[0].cartId },
                 });
 
                 // 11. Create audit log
@@ -340,7 +351,7 @@ const validateCheckout = async (req, res) => {
                 cart: { status: "ACTIVE" },
             },
             include: {
-                productVariant: {
+                variant: {
                     include: {
                         inventory: true,
                         product: true,
@@ -360,7 +371,7 @@ const validateCheckout = async (req, res) => {
         let subtotal = new Decimal(0);
 
         for (const item of cartItems) {
-            const variant = item.productVariant;
+            const variant = item.variantId;
 
             if (!variant || variant.deletedAt) {
                 issues.push({
@@ -421,7 +432,4 @@ const validateCheckout = async (req, res) => {
     }
 };
 
-export {
-    initiateCheckout,
-    validateCheckout,
-}; 
+export { initiateCheckout, validateCheckout };

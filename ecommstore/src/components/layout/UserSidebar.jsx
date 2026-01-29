@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { 
   Home, 
   FolderTree, 
@@ -17,67 +17,42 @@ import {
   Menu,
   X,
   Plus,
-  Edit
+  Edit,
+  ShoppingBag
 } from 'lucide-react';
 
-const menuItems = [
-  {
-    name: 'Home',
-    href: '/admin',
-    icon: <Home className="w-5 h-5" />,
-  },
-  {
-    name: 'Categories',
-    href: '/admin/categories',
-    icon: <FolderTree className="w-5 h-5" />,
-    subItems: [
-      { name: 'Add Category', href: '/admin/categories/add', icon: <Plus className="w-4 h-4" /> },
-      { name: 'Edit Categories', href: '/admin/categories/edit', icon: <Edit className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Products',
-    href: '/admin/products',
-    icon: <Package className="w-5 h-5" />,
-    subItems: [
-      { name: 'Add Product', href: '/admin/products/add', icon: <Plus className="w-4 h-4" /> },
-      { name: 'Edit Products', href: '/admin/products/edit', icon: <Edit className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Blog',
-    href: '/admin/blog',
-    icon: <FileText className="w-5 h-5" />,
-    subItems: [
-      { name: 'Add Blog Post', href: '/admin/blog/add', icon: <Plus className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Coupons',
-    href: '/admin/coupons',
-    icon: <Tag className="w-5 h-5" />,
-  },
-  {
-    name: 'Customers',
-    href: '/admin/customers',
-    icon: <Users className="w-5 h-5" />,
-  },
-  {
-    name: 'Orders',
-    href: '/admin/orders',
-    icon: <ShoppingCart className="w-5 h-5" />,
-  },
-  {
-    name: 'Settings',
-    href: '/admin/settings',
-    icon: <Settings className="w-5 h-5" />,
-  },
-];
-
-const Sidebar = () => {
+const UserSidebar = () => {
   const [expandedItems, setExpandedItems] = useState([]);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { id } = useParams();
+  const menuItems = [
+  {
+    name: 'Home',
+    href: `/user/${id}`,
+    icon: <Home className="w-5 h-5" />,
+  },
+  {
+    name: 'Orders',
+    href: `/user/${id}/orders`,
+    icon: <ShoppingCart className="w-5 h-5" />,
+  },
+  {
+    name: 'Shop',
+    href: `/user/${id}/shop`,
+    icon: <ShoppingBag className="w-5 h-5" />,
+  },
+  {
+    name: 'Profile',
+    href: `/user/${id}/profile`,
+    icon: <Users className="w-5 h-5" />,
+  },
+  {
+    name: 'Settings',
+    href: `/user/${id}/settings`,
+    icon: <Settings className="w-5 h-5" />,
+  },
+];
 
   const toggleExpanded = (itemName) => {
     setExpandedItems(prev =>
@@ -88,7 +63,7 @@ const Sidebar = () => {
   };
 
   const isActive = (href) => {
-    if (href === '/admin') {
+    if (href === `/user/${id}`) {
       return pathname === href;
     }
     return pathname.startsWith(href);
@@ -134,7 +109,7 @@ const Sidebar = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold text-white tracking-tight">
-                Admin Panel
+                User
               </h1>
               <p className="text-xs text-gray-300)">E-Commerce</p>
             </div>
@@ -226,10 +201,10 @@ const Sidebar = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-(--text-primary) truncate">
-                Admin User
+                User
               </p>
               <p className="text-xs text-(--text-secondary) truncate">
-                admin@store.com
+                user@store.com
               </p>
             </div>
           </div>
@@ -242,4 +217,4 @@ const Sidebar = () => {
   );
 }
 
-export default Sidebar;
+export default UserSidebar;

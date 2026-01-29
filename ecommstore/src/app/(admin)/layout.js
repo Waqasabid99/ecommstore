@@ -1,5 +1,6 @@
 import AdminNavbar from "@/components/layout/AdminNavbar";
 import Sidebar from "@/components/layout/Sidebar";
+import CheckAuth from "@/lib/AuthCheck";
 
 export const metadata = {
   title: "Admin - EcomStore",
@@ -10,6 +11,7 @@ export const metadata = {
 export default function AdminLayout({ children }) {
   return (
    <div className="min-h-screen bg-(--bg-page)">
+    <CheckAuth>
     <AdminNavbar />
       <Sidebar />
       
@@ -19,6 +21,7 @@ export default function AdminLayout({ children }) {
           {children}
         </div>
       </main>
+    </CheckAuth>
     </div>
   );
 }

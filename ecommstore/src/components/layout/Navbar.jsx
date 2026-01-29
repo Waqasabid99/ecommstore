@@ -21,7 +21,6 @@ import useAuth from "@/hooks/useAuth";
 import useAuthStore from "@/store/authStore";
 import { getCategories } from "@/lib/api/category";
 import useCartStore from "@/store/useCartStore";
-import { Skeleton } from "../ui/skeleton";
 
 const Navbar = ({ products }) => {
   console.log(products)
@@ -291,7 +290,7 @@ const Navbar = ({ products }) => {
                         </div>
                         <div className="py-2">
                           <Link
-                            href="/dashboard"
+                            href={user?.role === "admin" ? "/admin" : `/user/${user?.id}`}
                             className="flex items-center gap-3 px-4 py-2.5 text-(--text-primary) hover:bg-gray-50 transition-colors"
                             onClick={() => setOpenProfileDropDown(false)}
                           >

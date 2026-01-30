@@ -42,11 +42,11 @@ const UserSidebar = () => {
     href: `/user/${id}/shop`,
     icon: <ShoppingBag className="w-5 h-5" />,
   },
-  {
-    name: 'Profile',
-    href: `/user/${id}/profile`,
-    icon: <Users className="w-5 h-5" />,
-  },
+  // {
+  //   name: 'Profile',
+  //   href: `/user/${id}/profile`,
+  //   icon: <Users className="w-5 h-5" />,
+  // },
   {
     name: 'Settings',
     href: `/user/${id}/settings`,

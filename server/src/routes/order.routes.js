@@ -5,7 +5,7 @@ import { requireAdmin } from "../middleware/rbac.middleware.js";
 const orderRouter = express.Router();
 
 orderRouter.get("/", verifyUser, requireAdmin, getAllOrders);
-orderRouter.get("/user/:orderId", verifyUser, getUserOrders);
+orderRouter.get("/user", verifyUser, getUserOrders);
 orderRouter.get("/:orderId", verifyUser, getOrderById);
 orderRouter.patch("/:orderId/status", verifyUser, requireAdmin, updateOrderStatus)
 orderRouter.post("/:orderId/cancel", verifyUser, requireAdmin, cancelOrder)

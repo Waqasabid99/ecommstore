@@ -13,7 +13,7 @@ export const metadata = {
     "Access your account. Enjoy a personalized shopping experience, track your orders, and manage your preferences with ease.",
 };
 
-export default function AdminLayout({ children }) {
+export default function UserLayout({ children }) {
   return (
     <div className="min-h-screen bg-(--bg-page)">
       <CheckAuth>

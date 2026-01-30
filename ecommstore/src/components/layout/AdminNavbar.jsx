@@ -1,38 +1,28 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import {
-  Search,
   ShoppingCart,
   Heart,
   User,
   Menu,
   X,
-  ChevronLeft,
-  ChevronRight,
-  Phone,
-  Mail,
   LogOut,
   LayoutDashboard,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Navlinks } from "@/lib/utils";
 import useAuth from "@/hooks/useAuth";
 import useAuthStore from "@/store/authStore";
-import { getCategories } from "@/lib/api/category";
 import useCartStore from "@/store/useCartStore";
 
 const AdminNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openProfileDropDown, setOpenProfileDropDown] = useState(false);
-  const [categories, setCategories] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
   const { logout, checkAuth } = useAuthStore();
   const { isAuthenticated, user } = useAuth();
 
   const { getCartItems, getCartSummary } = useCartStore();
-  const cart = useCartStore((state) => state.cart);
   const { itemCount, subtotal } = getCartSummary();
 
   const cartItems = getCartItems();
@@ -57,7 +47,7 @@ const AdminNavbar = () => {
   };
 
   return (
-    <nav className="w-full bg-white border-b border-(--border-default) mb-5 sticky top-0 left-0 z-50">
+    <nav className="w-full bg-white border-b border-(--border-default) sticky top-0 left-0 z-50">
       {/* Main Navbar */}
       <div className="bg-white border-b border-(--border-default)">
         <div className="max-w-360 mx-auto px-4 sm:px-6 lg:px-8">

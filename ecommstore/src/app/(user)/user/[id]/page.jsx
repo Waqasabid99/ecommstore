@@ -1,8 +1,12 @@
-import React from 'react'
+import Dashboard from "@/components/userDashboard/pages/Dashboard"
+import { getOrders } from "@/lib/api/orders";
 
-const page = () => {
+const page = async () => {
+  const data = await getOrders();
   return (
-    <div>user dashboard</div>
+    <div>
+      <Dashboard data={data}/>
+    </div>
   )
 }
 

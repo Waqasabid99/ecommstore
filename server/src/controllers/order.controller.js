@@ -178,9 +178,55 @@ const getUserOrders = async (req, res) => {
             prisma.order.count({ where }),
         ]);
 
+        const { totalSpent, ...statusCounts } = orders.reduce(
+        (acc, order) => {
+            acc[order.status] = (acc[order.status] || 0) + 1;
+            acc.totalSpent = (acc.totalSpent || 0) + order?.payment?.amount || 0;
+            return acc;
+        },
+        {}
+        );
+
+        const totalOrders = orders.length;
+        const pendingOrders = statusCounts.PENDING || 0;
+        const deliveredOrders = statusCounts.DELIVERED || 0;
+        const cancelledOrders = statusCounts.CANCELLED || 0;
+        const refundedOrders = statusCounts.REFUNDED || 0;
+        const stats = [ 
+            {
+                label: "Total Orders",
+                value: totalOrders,
+            },
+            {
+                label: "Pending Orders",
+                value: pendingOrders,
+            },
+            {
+                label: "Delivered Orders",
+                value: deliveredOrders,
+            },
+            {
+                label: "Cancelled Orders",
+                value: cancelledOrders,
+            },
+            {
+                label: "Refunded Orders",
+                value: refundedOrders,
+            },
+            {
+                label: "Total Spent",
+                value: totalSpent,
+            },
+            {
+                label: "Average Order Value",
+                value: totalSpent / totalOrders,
+            }
+        ]
+        
         return res.status(200).json({
             success: true,
             data: orders,
+            stats,
             pagination: {
                 total,
                 page: Number(page),

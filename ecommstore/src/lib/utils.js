@@ -67,10 +67,6 @@ export const specialties = [
 
 export const columns = [
   {
-    key: "id",
-    header: "Order ID",
-  },
-  {
     key: "createdAt",
     header: "Order Date",
   },
@@ -82,6 +78,7 @@ export const columns = [
     key: "status",
     header: "Order Status",
   },
+  
 ];
 
 export const stats = [

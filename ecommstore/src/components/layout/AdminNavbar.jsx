@@ -26,7 +26,6 @@ const AdminNavbar = () => {
   const { itemCount, subtotal } = getCartSummary();
 
   const cartItems = getCartItems();
-  console.log(cartItems)
   const navigate = useRouter();
   const pathname = usePathname();
   const isUserPage = pathname.startsWith("/user/");

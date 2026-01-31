@@ -11,7 +11,7 @@ userRouter.get("/", verifyUser, requireAdmin, getAllUsers);
 userRouter.get("/:id", verifyUser, getSingleUser);
 
 // Update user
-userRouter.put("/update", verifyUser, updateUser);
+userRouter.patch("/update", verifyUser, updateUser);
 
 // Delete user (soft delete)
 userRouter.delete("/delete", verifyUser, deleteUser);

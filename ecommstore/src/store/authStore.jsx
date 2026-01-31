@@ -7,6 +7,8 @@ const useAuthStore = create(
   persist(
     (set, get) => ({
       user: null,
+      address: [],
+      isAuthenticated: false,
       isLoading: false,
       error: null,
 
@@ -15,7 +17,7 @@ const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const { data } = await api.post("/auth/register", formData);
-          set({ user: data.user, isLoading: false });
+          set({ user: data.user, address: data.address, isLoading: false });
           return { success: true };
         } catch (err) {
           set({
@@ -28,25 +30,32 @@ const useAuthStore = create(
 
       // LOGIN
       login: async (formData) => {
-        set({ isLoading: true, error: null, isAuthenticated: false });
+        set({ isLoading: true, error: null });
         try {
           const { data } = await api.post("/auth/login", formData);
-          console.log(data)
-          if (data.success ) {
-            const { user } = data;
-            set({ user, isAuthenticated: true, isLoading: false });
+
+          if (!data.success) {
+            throw new Error(data.message || "Login failed");
           }
+          console.log(data);
+          set({
+            user: data.user,
+            address: data.address,
+            isAuthenticated: true,
+            isLoading: false,
+          });
 
           const cartStore = useCartStore.getState();
           await cartStore.mergeGuestCart();
           await cartStore.initializeCart();
+
           return { success: true };
         } catch (err) {
           set({
-            error: err.response?.data?.message || "Login failed",
+            error: err.response?.data?.message || err.message,
             isLoading: false,
+            isAuthenticated: false,
           });
-          console.log(err);
           return { success: false };
         }
       },
@@ -66,6 +75,8 @@ const useAuthStore = create(
       forceLogout: () => {
         set({
           user: null,
+          address: [],
+          isAuthenticated: false,
           isLoading: false,
           error: null,
         });
@@ -76,7 +87,7 @@ const useAuthStore = create(
         set({ isLoading: true });
         try {
           const { data } = await api.get("/auth/verify");
-          set({ user: data.user, isLoading: false });
+          set({ user: data.user, isLoading: false, isAuthenticated: true });
           return true;
         } catch (err) {
           // Only logout if refresh ALSO failed
@@ -93,6 +104,7 @@ const useAuthStore = create(
       name: "auth-storage",
       partialize: (state) => ({
         user: state.user,
+        address: state.address,
       }),
     }
   )

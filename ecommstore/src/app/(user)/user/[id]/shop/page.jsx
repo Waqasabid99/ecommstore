@@ -1,4 +1,5 @@
 import Products from "@/components/HomePage/Products"
+import DashboardHeadingBox from "@/components/ui/DashboardHeadingBox";
 import { getProducts } from "@/lib/api/product"
 
 export const metadata = {
@@ -8,7 +9,10 @@ export const metadata = {
 const page = async () => {
     const {data, pagination} = await getProducts();
   return (
+    <>
+    <DashboardHeadingBox text="Shop" subHeading={"Browse and shop a wide variety of products"}/>
     <Products products={data} pagination={pagination} />
+    </>
   )
 }
 

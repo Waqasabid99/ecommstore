@@ -61,9 +61,14 @@ const getSingleUser = async (req, res) => {
                 .json({ success: false, message: "User not found" });
         }
 
-        res.status(200).json({ success: true, data: safeUser(user) });
+        const userAddress = await prisma.address.findMany({
+            where: {
+                userId: id,
+            },
+        });
+        return res.status(200).json({ success: true, data: safeUser(user), address: userAddress });
     } catch (error) {
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Internal server error",
         });

@@ -5,6 +5,7 @@ import ProductCard from "@/components/product/ProductCard";
 import ProductRating from "@/components/ui/ProductRating";
 import { baseUrl } from "@/lib/utils";
 import ProductCardSkeleton from "@/components/product/ProductCardSkeleton";
+import { useParams, usePathname, useSearchParams } from "next/navigation";
 
 const ShopPage = ({ products, categories }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -30,7 +31,18 @@ const ShopPage = ({ products, categories }) => {
     totalPages: 1,
   });
   const [loading, setLoading] = useState(false);
-  // Extract unique brands from products (using first word of product name as brand)
+  const searchParam = useSearchParams();
+  const queryCategory = searchParam.get("category");
+
+useEffect(() => {
+  if (queryCategory) {
+    setSelectedCategories(
+      queryCategory.split(",").map((c) => c.toLowerCase())
+    );
+  }
+}, [queryCategory]);
+
+  // Extract unique brands from products
   const brands = useMemo(() => {
     const brandSet = new Set();
     products.forEach((product) => {
@@ -107,13 +119,13 @@ const ShopPage = ({ products, categories }) => {
     sortBy,
   ]);
 
-  const toggleCategory = (categorySlug) => {
-    setSelectedCategories((prev) =>
-      prev.includes(categorySlug)
-        ? prev.filter((c) => c !== categorySlug)
-        : [...prev, categorySlug],
-    );
-  };
+const toggleCategory = (categorySlug) => {
+  setSelectedCategories((prev) =>
+    prev.includes(categorySlug)
+      ? prev.filter((c) => c !== categorySlug)
+      : [...prev, categorySlug],
+  );
+};
 
   const toggleBrand = (brand) => {
     setSelectedBrands((prev) =>

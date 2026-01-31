@@ -74,6 +74,12 @@ const loginUser = async (req, res) => {
             }
         }
 
+        const userAddress = await prisma.address?.findMany({
+            where: {
+                userId: user.id,
+            },
+        })
+        console.log(userAddress);
         // Generate tokens
         const accessToken = generateToken(user);
         const rawRefreshToken = generateRefreshToken();
@@ -101,7 +107,8 @@ const loginUser = async (req, res) => {
             .json({
                 success: true,
                 message: "Login successful",
-                user: safeUser(user),
+                user: {...safeUser(user), userAddress},
+                address: userAddress || [],
             });
     } catch (error) {
         res.status(500).json({

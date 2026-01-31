@@ -15,7 +15,6 @@ const FloatingCart = () => {
   const cartItems = getCartItems();
   const [isLoading, setIsLoading] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  console.log(cartItems);
   const router = useRouter();
 
 const updateQuantity = async (itemId, currentQty, delta) => {

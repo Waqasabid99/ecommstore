@@ -22,8 +22,7 @@ import useAuthStore from "@/store/authStore";
 import { getCategories } from "@/lib/api/category";
 import useCartStore from "@/store/useCartStore";
 
-const Navbar = ({ products }) => {
-  console.log(products)
+const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openProfileDropDown, setOpenProfileDropDown] = useState(false);
   const [categories, setCategories] = useState([]);

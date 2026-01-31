@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 
-const Table = ({ columns, data, sortable = true, hoverable = true, striped = false }) => {
+const Table = ({ columns, data, sortable = true, hoverable = true, striped = false, actions }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const handleSort = (columnKey) => {
@@ -86,12 +86,17 @@ const Table = ({ columns, data, sortable = true, hoverable = true, striped = fal
                 </div>
               </th>
             ))}
+            {actions && (
+              <th className="px-5 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                Actions
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
           {sortedData.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-5 py-16 text-center">
+              <td colSpan={columns.length + (actions ? 1 : 0)} className="px-5 py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-600">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-40">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -118,6 +123,13 @@ const Table = ({ columns, data, sortable = true, hoverable = true, striped = fal
                     {column.render ? column.render(item[column.key], item) : item[column.key]}
                   </td>
                 ))}
+                {actions && (
+                  <td className="px-5 py-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      {actions(item)}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))
           )}

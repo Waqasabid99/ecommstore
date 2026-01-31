@@ -1,15 +1,13 @@
-'use client';
-import useAuthStore from '@/store/authStore';
-import React, { useEffect } from 'react'
+"use client";
+import { useEffect } from "react";
+import useAuthStore from "@/store/authStore";
 
-const CheckAuth = ({children}) => {
-    const { checkAuth } = useAuthStore();
-    useEffect(() => {
-        checkAuth();
-    }, [])
-  return (
-    <div>{children}</div>
-  )
+export default function checkAuth({ children }) {
+  const checkAuth = useAuthStore((s) => s.checkAuth);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  return children;
 }
-
-export default CheckAuth;

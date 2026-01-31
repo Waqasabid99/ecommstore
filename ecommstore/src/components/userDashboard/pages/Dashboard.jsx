@@ -2,7 +2,7 @@
 import Stats from "@/components/ui/Stats";
 import Table from "@/components/ui/Table";
 import useAuthStore from "@/store/authStore";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import {
   ShoppingCart,
   CheckCircle,
@@ -10,9 +10,11 @@ import {
   RefreshCcw,
   DollarSign,
   TrendingUp,
+  Eye,
 } from "lucide-react";
 import { columns, formatDate } from "@/lib/utils";
 import DashboardHeadingBox from "@/components/ui/DashboardHeadingBox";
+import { useRouter } from "next/navigation";
 
 const statIcons = {
   "Total Orders": <ShoppingCart className="w-6 h-6" />,
@@ -26,8 +28,8 @@ const statIcons = {
 
 const Dashboard = ({ data: orders }) => {
   const { stats } = orders;
-  console.log(orders.data);
   const { user } = useAuthStore();
+  const navigate = useRouter();
   const [userOrders, setUserOrders] = useState([]);
   const statsWithIcons = stats.map((stat) => ({
     ...stat,
@@ -35,9 +37,12 @@ const Dashboard = ({ data: orders }) => {
   }));
 
   const updatedData = orders.data.map((order) => ({
-    ...order, createdAt: formatDate(order.createdAt), id: order.id.substr(0, 8).toUpperCase()
-  }))
-
+    ...order,
+    createdAt: formatDate(order.createdAt),
+  }));
+  const handleView = (item) => {
+    navigate.push(`/user/${user.id}/orders/${item.id}`);
+  };
   useEffect(() => {
     setUserOrders(orders);
   }, [orders]);
@@ -45,7 +50,9 @@ const Dashboard = ({ data: orders }) => {
   return (
     <div>
       {/* Welcome Message */}
-      <DashboardHeadingBox text={`Welcome back, ${user?.userName || "Guest"} 👋`} />
+      <DashboardHeadingBox
+        text={`Welcome back, ${user?.userName || "Guest"} 👋`}
+      />
 
       {/* Stats Section */}
       <Stats
@@ -55,7 +62,18 @@ const Dashboard = ({ data: orders }) => {
       />
       {/* Latest Orders */}
       <h2 className="text-xl my-3.5">Your Latest Orders</h2>
-      <Table columns={columns} data={updatedData} />
+      <Table
+        columns={columns}
+        data={updatedData}
+        actions={(item) => (
+          <button
+            className="p-2 hover:bg-black hover:text-white hover:rounded hover:p-2"
+            onClick={() => handleView(item)}
+          >
+            <Eye aria-label="view order" size={16} />{" "}
+          </button>
+        )}
+      />
     </div>
   );
 };

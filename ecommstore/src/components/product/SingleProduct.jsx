@@ -76,10 +76,10 @@ const SingleProductPage = ({ products }) => {
                 <Image
                   src={
                     `${
-                      selectedImage ? selectedImage : product.thumbnail
+                      selectedImage ? selectedImage : product?.thumbnail
                     }` || "/placeholder.png"
                   }
-                  alt={product.name}
+                  alt={product?.name}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 600px"
@@ -148,16 +148,16 @@ const SingleProductPage = ({ products }) => {
                   {product?.category?.name}
                 </span>
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-(--text-heading) mb-2">
-                  {product.name}
+                  {product?.name}
                 </h1>
                 <p className="text-(--text-secondary) text-xs sm:text-sm">
                   Brand:{" "}
                   <span className="font-medium text-(--text-primary)">
-                    {product.brand || "Not Specified"}
+                    {product?.brand || "Not Specified"}
                   </span>{" "}
                   | SKU:{" "}
                   <span className="font-medium text-(--text-primary)">
-                    {product.variants?.[0]?.sku}
+                    {product?.variants?.[0]?.sku}
                   </span>
                 </p>
               </div>
@@ -165,9 +165,9 @@ const SingleProductPage = ({ products }) => {
               {/* Rating */}
               <div className="flex items-center gap-4 pb-4 border-b border-(--border-default)">
                 <ProductRating
-                  rating={product.rating}
+                  rating={product?.rating}
                   showCount
-                  reviewCount={product.reviewCount}
+                  reviewCount={product?.reviewCount}
                   size="lg"
                 />
               </div>
@@ -177,13 +177,13 @@ const SingleProductPage = ({ products }) => {
                 <span className="text-3xl sm:text-4xl font-bold text-red-500">
                   Rs. {product?.variants?.[0]?.price || "0.00"}
                 </span>
-                {product.discount && (
+                {product?.discount && (
                   <>
                     <span className="text-lg sm:text-xl text-(--text-secondary) line-through">
-                      Rs. {product.originalPrice}
+                      Rs. {product?.originalPrice}
                     </span>
                     <span className="bg-red-500 text-white text-xs sm:text-sm font-semibold px-2 sm:px-3 py-1 rounded-full">
-                      {product.discount}% OFF
+                      {product?.discount}% OFF
                     </span>
                   </>
                 )}
@@ -191,7 +191,7 @@ const SingleProductPage = ({ products }) => {
 
               {/* Stock Status */}
               <div className="flex items-center gap-2">
-                {product.isActive && product.variants?.[0]?.availableQty > 0 ? (
+                {product?.isActive && product?.variants?.[0]?.availableQty > 0 ? (
                   <>
                     <Check size={20} className="text-green-500" />
                     <span className="text-green-500 font-medium text-sm sm:text-base">In Stock</span>
@@ -250,7 +250,7 @@ const SingleProductPage = ({ products }) => {
     flex items-center justify-center gap-2
     transition-all duration-200
     ${
-      quantity === 0 || !product.isActive || isLoading
+      quantity === 0 || !product?.isActive || isLoading
         ? "cursor-not-allowed bg-(--btn-bg-primary) bg-opacity-50 text-(--btn-text-primary) opacity-70"
         : "bg-(--btn-bg-primary) text-(--btn-text-primary) hover:bg-(--btn-bg-hover)"
     }
@@ -339,7 +339,7 @@ const SingleProductPage = ({ products }) => {
                   : "text-(--text-secondary) hover:text-(--text-primary)"
               }`}
             >
-              Reviews ({product.reviewCount})
+              Reviews ({product?.reviewCount})
             </button>
           </div>
 
@@ -351,7 +351,7 @@ const SingleProductPage = ({ products }) => {
                   Product Description
                 </h3>
                 <p className="text-(--text-secondary) leading-relaxed mb-4 text-sm sm:text-base">
-                  {product.description}
+                  {product?.description}
                 </p>
               </div>
             )}

@@ -15,7 +15,7 @@ const ProductCard = ({ product }) => {
 
     // Get the first variant (required in variant-first approach)
     const firstVariant = product.variants?.[0];
-    
+
     if (!firstVariant) {
       console.error("No variant available for product");
       return;
@@ -35,14 +35,14 @@ const ProductCard = ({ product }) => {
   };
 
   // Get thumbnail from new data structure
-  const mainImage = product.thumbnail || product.images?.[0] || "/placeholder.png";
+  const mainImage =
+    product.thumbnail || product.images?.[0] || "/placeholder.png";
 
   // Get price from first variant
   const displayPrice = product.variants?.[0]?.price || "0";
 
   return (
     <div className="group relative border border-(--border-default) overflow-hidden flex flex-col">
-
       {/* Top */}
       <div className="flex justify-between items-center px-4 pt-4">
         <Link href={`/shop/products/${product.slug}`}>
@@ -63,13 +63,11 @@ const ProductCard = ({ product }) => {
       <div className="relative flex justify-center items-center p-3">
         <Link href={`/shop/products/${product.slug}`}>
           <Image
-            src={`${mainImage}`}
+            src={mainImage}
             alt={product.name}
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             width={280}
             height={280}
-            priority
-            className="h-40 object-cover transition-transform duration-300 group-hover:scale-110"
+            className="h-40 w-auto object-cover transition-transform duration-300 group-hover:scale-110"
           />
         </Link>
 
@@ -82,19 +80,20 @@ const ProductCard = ({ product }) => {
                      text-(--btn-text-primary)
                      rounded-full px-4 py-1 disabled:opacity-50"
         >
-          {isLoading ? <Loader text={"Adding..."} size="lg"/> : "Add to Cart"}
+          {isLoading ? <Loader text={"Adding..."} size="lg" /> : "Add to Cart"}
         </button>
       </div>
 
       {/* Bottom */}
       <div className="border-t border-(--border-default) px-4 py-5 flex flex-col gap-2">
         <Link href={`/shop/products/${product.slug}`}>
-
           {/* Category badge */}
-          <span className="text-[10px] text-(--text-inverse)
+          <span
+            className="text-[10px] text-(--text-inverse)
                            bg-(--bg-primary)
                            border border-(--border-default)
-                           rounded-full px-3 py-1 w-fit">
+                           rounded-full px-3 py-1 w-fit"
+          >
             {product.category?.name || product.categoryName}
           </span>
 
@@ -120,7 +119,7 @@ const ProductCard = ({ product }) => {
                      text-(--btn-text-primary)
                      rounded-full px-4 py-1 disabled:opacity-50"
         >
-          {isLoading ? <Loader text={"Adding..."} size="sm"/> : "Add to Cart"}
+          {isLoading ? <Loader text={"Adding..."} size="sm" /> : "Add to Cart"}
         </button>
       </div>
     </div>

@@ -8,6 +8,9 @@ export const getOrders = async () => {
       headers: {
         Cookie: cookieStore.toString(),
       },
+      next: {
+        revalidate: 60,
+      },
      cache: "no-cache",
     });
   

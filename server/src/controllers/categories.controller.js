@@ -87,16 +87,18 @@ const getAllCategoriesForAdmin = async (req, res) => {
 
 // Get category by ID
 const getCategoryById = async (req, res) => {
+  const { id } = req.params;
+  console.log(id)
     try {
-        const { id } = req.params;
         const category = await prisma.category.findUnique({
-            where: { id: parseInt(id) }
+            where: { id },
         });
         if (!category) {
             return res.status(404).json({ success: false, error: "Category not found" });
         }
         return res.status(200).json({ success: true, data: category });
     } catch (error) {
+      console.error(error);
         return res.status(500).json({ success: false, error: "Internal Server Error" });
     }
 }
@@ -104,7 +106,6 @@ const getCategoryById = async (req, res) => {
 // Create Category
 const createCategory = async (req, res) => {
   const { name, parentId } = req.body;
-
   if (!name) {
     return res.status(400).json({
       success: false,
@@ -254,6 +255,7 @@ const updateCategory = async (req, res) => {
       data: result,
     });
   } catch (error) {
+    console.log(error)
     if (error.message === "CATEGORY_NOT_FOUND") {
       return res.status(404).json({ success: false, error: "Category not found" });
     }
@@ -290,7 +292,7 @@ const updateCategory = async (req, res) => {
 // Delete category
 const deleteCategory = async (req, res) => {
   const { id } = req.params;
-
+console.log(id)
   try {
     const result = await prisma.$transaction(async (tx) => {
       // Fetch category 
@@ -301,7 +303,7 @@ const deleteCategory = async (req, res) => {
           children: { select: { id: true } },
         },
       });
-
+      console.log(category)
       if (!category) {
         throw new Error("CATEGORY_NOT_FOUND");
       }
@@ -363,6 +365,7 @@ const deleteCategory = async (req, res) => {
       data: result,
     });
   } catch (error) {
+    console.log(error)
     if (error.message === "CATEGORY_NOT_FOUND") {
       return res.status(404).json({ success: false, error: "Category not found" });
     }

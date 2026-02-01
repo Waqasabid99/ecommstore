@@ -5,7 +5,7 @@ import { baseUrl } from "../utils";
 export const getCategories = cache(async () => {
   const res = await fetch(`${baseUrl}/categories`, {
     next: {
-      revalidate: 300,
+      revalidate: 20,
       tags: ["categories"],
     },
   });

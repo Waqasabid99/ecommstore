@@ -1,8 +1,13 @@
+import CreateCategoryPage from '@/components/admin/pages/CreateNewCategory'
+import { getCategories } from '@/lib/api/category';
 import React from 'react'
 
-const page = () => {
+const page = async () => {
+  const categories = await getCategories();
   return (
-    <div>new category</div>
+    <div>
+      <CreateCategoryPage existingCategories={categories} />
+    </div>
   )
 }
 

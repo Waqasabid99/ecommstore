@@ -173,6 +173,7 @@ model Product {
   name        String
   slug        String  @unique
   description String
+  tag         String?
   isActive    Boolean @default(true)
 
   categoryId String

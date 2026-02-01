@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { 
   Home, 
   FolderTree, 
@@ -20,64 +20,63 @@ import {
   Edit
 } from 'lucide-react';
 
-const menuItems = [
-  {
-    name: 'Home',
-    href: '/admin',
-    icon: <Home className="w-5 h-5" />,
-  },
-  {
-    name: 'Categories',
-    href: '/admin/categories',
-    icon: <FolderTree className="w-5 h-5" />,
-    subItems: [
-      { name: 'Add Category', href: '/admin/categories/add', icon: <Plus className="w-4 h-4" /> },
-      { name: 'Edit Categories', href: '/admin/categories/edit', icon: <Edit className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Products',
-    href: '/admin/products',
-    icon: <Package className="w-5 h-5" />,
-    subItems: [
-      { name: 'Add Product', href: '/admin/products/add', icon: <Plus className="w-4 h-4" /> },
-      { name: 'Edit Products', href: '/admin/products/edit', icon: <Edit className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Blog',
-    href: '/admin/blog',
-    icon: <FileText className="w-5 h-5" />,
-    subItems: [
-      { name: 'Add Blog Post', href: '/admin/blog/add', icon: <Plus className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Coupons',
-    href: '/admin/coupons',
-    icon: <Tag className="w-5 h-5" />,
-  },
-  {
-    name: 'Customers',
-    href: '/admin/customers',
-    icon: <Users className="w-5 h-5" />,
-  },
-  {
-    name: 'Orders',
-    href: '/admin/orders',
-    icon: <ShoppingCart className="w-5 h-5" />,
-  },
-  {
-    name: 'Settings',
-    href: '/admin/settings',
-    icon: <Settings className="w-5 h-5" />,
-  },
-];
-
 const Sidebar = () => {
   const [expandedItems, setExpandedItems] = useState([]);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { adminID } = useParams();
+  const menuItems = [
+  {
+    name: 'Home',
+    href: `/admin/${adminID}`,
+    icon: <Home className="w-5 h-5" />,
+  },
+  {
+    name: 'Categories',
+    href: `/admin/${adminID}/categories`,
+    icon: <FolderTree className="w-5 h-5" />,
+    subItems: [
+      { name: 'Add Category', href: `/admin/${adminID}/categories/new`, icon: <Plus className="w-4 h-4" /> },
+    ],
+  },
+  {
+    name: 'Products',
+    href: `/admin/${adminID}/products`,
+    icon: <Package className="w-5 h-5" />,
+    subItems: [
+      { name: 'Add Product', href: `/admin/${adminID}/products/new`, icon: <Plus className="w-4 h-4" /> },
+    ],
+  },
+  {
+    name: 'Blog',
+    href: `/admin/${adminID}/blog`,
+    icon: <FileText className="w-5 h-5" />,
+    subItems: [
+      { name: 'Add Blog Post', href: `/admin/${adminID}/blog/add`, icon: <Plus className="w-4 h-4" /> },
+    ],
+  },
+  {
+    name: 'Coupons',
+    href: `/admin/${adminID}/coupons`,
+    icon: <Tag className="w-5 h-5" />,
+  },
+  {
+    name: 'Customers',
+    href: `/admin/${adminID}/customers`,
+    icon: <Users className="w-5 h-5" />,
+  },
+  {
+    name: 'Orders',
+    href: `/admin/${adminID}/orders`,
+    icon: <ShoppingCart className="w-5 h-5" />,
+  },
+  {
+    name: 'Settings',
+    href: `/admin/${adminID}/settings`,
+    icon: <Settings className="w-5 h-5" />,
+  },
+];
+
 
   const toggleExpanded = (itemName) => {
     setExpandedItems(prev =>
@@ -88,7 +87,7 @@ const Sidebar = () => {
   };
 
   const isActive = (href) => {
-    if (href === '/admin') {
+    if (href === '/admin/' + adminID) {
       return pathname === href;
     }
     return pathname.startsWith(href);

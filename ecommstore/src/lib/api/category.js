@@ -14,5 +14,6 @@ export const getCategories = cache(async () => {
     throw new Error("Failed to fetch categories");
   }
 
-  return res.json();
+  const { data } = await res.json();
+  return data;
 });

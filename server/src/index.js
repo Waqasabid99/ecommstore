@@ -13,6 +13,7 @@ import checkoutRouter from "./routes/checkout.routes.js";
 import orderRouter from "./routes/order.routes.js";
 import couponRouter from "./routes/coupon.routes.js";
 import addressRouter from "./routes/address.routes.js";
+import dashboardRouter from "./routes/dashboard.routes.js";
 const app = express();
 const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
 
@@ -43,6 +44,7 @@ app.use("/cart", cartRouter);
 app.use("/coupons", couponRouter);
 app.use("/checkout", checkoutRouter);
 app.use("/orders", orderRouter);
+app.use("/dashboard", dashboardRouter);
 app.use("/seed", seedRouter);
 
 app.listen(port, () => {

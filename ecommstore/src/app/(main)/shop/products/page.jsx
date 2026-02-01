@@ -7,8 +7,8 @@ export const metadata = {
 }
 
 const page = async () => {
-   const fetchedProduct = await getProducts();
-   const products = fetchedProduct.data;
+   const {data: products} = await getProducts();
+   console.log(products)
   return (
     <div>
       <SingleProductPage products={products} />

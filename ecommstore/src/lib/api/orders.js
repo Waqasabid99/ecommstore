@@ -1,6 +1,5 @@
 import { cookies } from "next/headers"
 import { baseUrl } from "../utils";
-import { cache } from "react";
 
 export const getOrders = async () => {
     const cookieStore = await cookies();

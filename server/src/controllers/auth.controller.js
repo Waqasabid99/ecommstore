@@ -145,7 +145,7 @@ const resetPassword = async (req, res) => {
         }
         const hashedNewPassword = await hashPassword(newPassword);
         await prisma.user.update({
-            where: { email },
+            where: { email: user.email },
             data: { password: hashedNewPassword },
         });
         res.status(200).json({
@@ -178,7 +178,7 @@ const forgotPassword = async (req, res) => {
 
         // Generate secure token
         const rawToken = generateRefreshToken();
-        const tokenHash = hashToken(rawRefreshToken);
+        const tokenHash = hashToken(rawToken);
         // Invalidate old tokens
         await prisma.passwordResetToken.updateMany({
             where: {

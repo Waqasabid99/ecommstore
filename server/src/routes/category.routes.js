@@ -9,21 +9,21 @@ import {
 import { verifyUser } from "../middleware/auth.middleware.js";
 import { requireAdmin } from "../middleware/rbac.middleware.js";
 
-const router = express.Router();
+const categoryRouter = express.Router();
 
 // List all categories
-router.get("/", getAllCategories);
+categoryRouter.get("/", getAllCategories);
 
 // Get single category by ID
-router.get("/:id", getCategoryById);
+categoryRouter.get("/:id", verifyUser, requireAdmin, getCategoryById);
 
 // Create a new category
-router.post("/create",  createCategory);
+categoryRouter.post("/create", verifyUser, requireAdmin, createCategory);
 
 // Update category
-router.patch("/update/:id",  updateCategory);
+categoryRouter.patch("/update/:id", verifyUser, requireAdmin, updateCategory);
 
 // Delete category
-router.delete("/delete/:id", deleteCategory);
+categoryRouter.delete("/delete/:id", verifyUser, requireAdmin, deleteCategory);
 
-export default router;
+export default categoryRouter;

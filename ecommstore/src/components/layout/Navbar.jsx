@@ -289,7 +289,7 @@ const Navbar = () => {
                         </div>
                         <div className="py-2">
                           <Link
-                            href={user?.role === "admin" ? "/admin" : `/user/${user?.id}`}
+                            href={user?.role === "ADMIN" ? `/admin/${user?.id}` : `/user/${user?.id}`}
                             className="flex items-center gap-3 px-4 py-2.5 text-(--text-primary) hover:bg-gray-50 transition-colors"
                             onClick={() => setOpenProfileDropDown(false)}
                           >

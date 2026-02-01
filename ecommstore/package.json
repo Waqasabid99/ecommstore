@@ -28,6 +28,7 @@
     "react-phone-input-2": "^2.15.1",
     "react-select": "^5.10.2",
     "react-toastify": "^11.0.5",
+    "recharts": "^3.7.0",
     "tailwind-animate": "^0.2.10",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",

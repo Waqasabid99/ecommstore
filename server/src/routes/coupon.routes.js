@@ -10,7 +10,7 @@ couponRouter.post("/", verifyUser, requireAdmin, createCoupon);
 couponRouter.patch("/:id", verifyUser, requireAdmin, updateCoupon);
 couponRouter.delete("/:id", verifyUser, requireAdmin, deleteCoupon);
 couponRouter.patch("/:id/toggleStatus", verifyUser, requireAdmin, toggleCouponStatus);
-couponRouter.post("/validate", verifyUser, requireAdmin, validateCoupon);
+couponRouter.post("/validate", verifyUser, validateCoupon);
 couponRouter.get("/:id/stats", verifyUser, requireAdmin, getCouponStats);
 couponRouter.post("/bulk", verifyUser, requireAdmin, bulkCreateCoupons);
 

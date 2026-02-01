@@ -8,14 +8,13 @@ export const metadata = {
 }
 
 const page = async () => {
-  const fetchedproducts = await getProducts();
-  const fetchedcategories = await getCategories();
-  const products = fetchedproducts.data;
-  const pagination = fetchedproducts.pagination;
-  const categories = fetchedcategories.data;
+  const products = await getProducts();
+  const {pagination} = await getProducts();
+  const categories = await getCategories();
+  console.log(products)
   return (
     <main>
-      <ShopPage products={products} categories={categories} pagination={pagination}/>
+      <ShopPage products={products} categories={categories} pagination={pagination} />
     </main>
   )
 }

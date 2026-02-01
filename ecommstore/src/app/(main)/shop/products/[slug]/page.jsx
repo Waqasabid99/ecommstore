@@ -2,8 +2,7 @@ import SingleProductPage from "@/components/product/SingleProduct";
 import { getProducts } from "@/lib/api/product"
 
 const page = async () => {
-    const fetchedProduct = await getProducts();
-    const products = fetchedProduct.data;
+    const products = await getProducts();
   return (
     <div>
         <SingleProductPage products={products} />

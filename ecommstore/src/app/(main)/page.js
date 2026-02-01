@@ -10,10 +10,8 @@ import { getCategories } from "@/lib/api/category";
 import { getProducts } from "@/lib/api/product";
 
 export default async function Home() {
-  const fetchedProducts = await getProducts();
-  const fetchedCategories = await getCategories();
-  const products = fetchedProducts.data;
-  const categories = fetchedCategories.data;
+  const products = await getProducts();
+  const categories = await getCategories();
   return (
     <>
       <PageTransition>

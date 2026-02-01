@@ -1,8 +1,6 @@
 import { cache } from "react";
 import { baseUrl } from "../utils";
-/**
- * Cached server-side fetch
- */
+
 export const getProducts = cache(async () => {
   const res = await fetch(`${baseUrl}/products`, {
     next: {
@@ -16,5 +14,7 @@ export const getProducts = cache(async () => {
     throw new Error("Failed to fetch products");
   }
 
-  return res.json();
+  const { data } = await res.json();
+  console.log(data)
+  return data;
 });

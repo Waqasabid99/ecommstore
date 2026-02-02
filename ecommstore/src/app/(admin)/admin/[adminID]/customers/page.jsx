@@ -1,8 +1,10 @@
-import React from 'react'
+import Customers from '@/components/admin/pages/Customer'
 
 const page = () => {
   return (
-    <div>customers</div>
+    <div>
+      <Customers />
+    </div>
   )
 }
 

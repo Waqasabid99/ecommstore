@@ -1,5 +1,5 @@
 import { prisma } from "../config/prisma.js";
-import { uploadBuffer } from "../constants/uploadToCloudinary.js";
+import { uploadBuffer, deleteImage } from "../constants/uploadToCloudinary.js";
 import slugify from "slugify";
 import fs from "fs";
 
@@ -102,11 +102,33 @@ const getProductById = async (req, res) => {
                 success: false,
                 error: "Product not found",
             });
-        }
+        }   
+        // Get Category
+        const category = await prisma.category.findUnique({
+            where: { id: product.categoryId },
+        });
+        
+        // Optional: frontend-friendly transformation
+        const transformed = {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            slug: product.slug,
+            tag: product.tag,
+            brand: product.brand,
+            isActive: product.isActive,
+            category: category.id,
+            categoryName: category.name,
+            thumbnail: product.images.find((i) => i.isMain) || "",
+            images: product.images.map((i) => i),
+            createdAt: product.createdAt,
+            updatedAt: product.updatedAt,
+            variants: product.variants,
+        };
 
         res.status(200).json({
             success: true,
-            data: product,
+            data: transformed,
         });
     } catch (error) {
         console.error("Get product error:", error);
@@ -119,193 +141,197 @@ const getProductById = async (req, res) => {
 
 // Create product
 const createProduct = async (req, res) => {
-    const {
-        name,
-        description,
-        tag,
-        brand,
-        categoryId,
-        isActive = true,
-        variants,
-    } = req.body;
+  const { name, description, brand, categoryId, variants } = req.body;
 
-    const thumbnailFile = req.files?.thumbnail?.[0] || null;
-    const secondaryImages = req.files?.images || [];
+  const isActive = req.body.isActive === "true";
+  const thumbnailFile = req.files?.thumbnail?.[0] || null;
+  const secondaryImages = req.files?.images || [];
 
-    if (!name || !categoryId) {
-        return res.status(400).json({
-            success: false,
-            message: "Missing required fields",
-        });
+  if (!name || !categoryId) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields",
+    });
+  }
+
+  // ---------------------------
+  // Parse tags
+  // ---------------------------
+  let tag = [];
+  try {
+    tag =
+      typeof req.body.tag === "string"
+        ? JSON.parse(req.body.tag)
+        : req.body.tag ?? [];
+  } catch {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid tag format",
+    });
+  }
+
+  // ---------------------------
+  // Parse variants (required)
+  // ---------------------------
+  let parsedVariants;
+  try {
+    parsedVariants = JSON.parse(variants);
+    if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+      throw new Error();
+    }
+  } catch {
+    return res.status(400).json({
+      success: false,
+      message: "At least one product variant is required",
+    });
+  }
+
+  const slugBase = slugify(name, { lower: true, strict: true });
+
+  // ---------------------------
+  // 1️⃣ Upload images FIRST (outside transaction)
+  // ---------------------------
+  const uploadedImages = [];
+
+  try {
+    if (thumbnailFile) {
+      const res = await uploadBuffer(thumbnailFile.buffer, "products");
+      uploadedImages.push({
+        url: res.secure_url,
+        publicId: res.public_id,
+        isMain: true,
+      });
     }
 
-    let parsedVariants;
-
-    // Variants are REQUIRED in variant-first model
-    try {
-        parsedVariants = JSON.parse(variants);
-        if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
-            throw new Error();
-        }
-    } catch {
-        return res.status(400).json({
-            success: false,
-            message: "At least one product variant is required",
-        });
+    for (const img of secondaryImages) {
+      const res = await uploadBuffer(img.buffer, "products");
+      uploadedImages.push({
+        url: res.secure_url,
+        publicId: res.public_id,
+        isMain: false,
+      });
     }
+  } catch (err) {
+    console.error("Image upload failed:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Image upload failed",
+    });
+  }
 
-    const slug = slugify(name, { lower: true, strict: true });
-    const uploadedFiles = [thumbnailFile, ...secondaryImages].filter(Boolean);
+  // ---------------------------
+  // 2️⃣ Database transaction (DB ONLY)
+  // ---------------------------
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Validate category
+      const category = await tx.category.findUnique({
+        where: { id: categoryId },
+      });
 
-    try {
-        const result = await prisma.$transaction(async (tx) => {
-            // 1️⃣ Validate category
-            const category = await tx.category.findUnique({
-                where: { id: categoryId },
-            });
+      if (!category) {
+        throw new Error("Category not found");
+      }
 
-            if (!category) {
-                throw new Error("Category not found");
-            }
+      // Ensure slug uniqueness
+      let slug = slugBase;
+      const exists = await tx.product.findUnique({ where: { slug } });
+      if (exists) {
+        slug = `${slugBase}-${Math.floor(Math.random() * 10000)}`;
+      }
 
-            // 2️⃣ Ensure slug uniqueness
-            let slugToUse = slug;
+      // Create product
+      const product = await tx.product.create({
+        data: {
+          name,
+          description,
+          tag,
+          brand,
+          slug,
+          isActive,
+          categoryId,
+        },
+      });
 
-            // Append random short string if needed
-            const exists = await tx.product.findUnique({
-                where: { slug: slugToUse },
-            });
-            if (exists) {
-                slugToUse = `${slug}-${Math.floor(Math.random() * 10000)}`;
-            }
-
-            // 3️⃣ Create product
-            const product = await tx.product.create({
-                data: {
-                    name,
-                    tag,
-                    brand,
-                    slug: slugToUse,
-                    description,
-                    isActive,
-                    categoryId,
-                },
-            });
-
-            const createdVariants = [];
-
-            // 4️⃣ Create variants + inventory
-            for (const variant of parsedVariants) {
-                if (!variant.sku || !variant.price) {
-                    throw new Error("Each variant must have sku and price");
-                }
-
-                const createdVariant = await tx.productVariant.create({
-                    data: {
-                        productId: product.id,
-                        sku: variant.sku,
-                        price: parseFloat(variant.price),
-                        attributes: variant.attributes ?? null,
-                    },
-                });
-
-                await tx.inventory.create({
-                    data: {
-                        variantId: createdVariant.id,
-                        quantity: variant.quantity ?? 0,
-                        reserved: 0,
-                    },
-                });
-
-                createdVariants.push(createdVariant);
-            }
-
-            // 5️⃣ Images (Cloudinary)
-            if (uploadedFiles.length > 0) {
-                const uploads = [];
-
-                if (thumbnailFile) {
-                    uploads.push(
-                        uploadBuffer(thumbnailFile.buffer, "products").then(
-                            (res) => ({
-                                productId: product.id,
-                                url: res.secure_url,
-                                publicId: res.public_id,
-                                isMain: true,
-                            })
-                        )
-                    );
-                }
-
-                for (const img of secondaryImages) {
-                    uploads.push(
-                        uploadBuffer(img.buffer, "products").then((res) => ({
-                            productId: product.id,
-                            url: res.secure_url,
-                            publicId: res.public_id,
-                            isMain: false,
-                        }))
-                    );
-                }
-
-                const uploadedImages = await Promise.all(uploads);
-
-                await tx.productImage.createMany({
-                    data: uploadedImages,
-                });
-            }
-
-            // 6️⃣ Audit log
-            await tx.auditLog.create({
-                data: {
-                    action: "CREATE",
-                    entity: "PRODUCT",
-                    entityId: product.id,
-                    metadata: {
-                        name,
-                        slug,
-                        categoryId,
-                        variantsCount: createdVariants.length,
-                    },
-                },
-            });
-
-            return {
-                product,
-                thumbnail: thumbnailFile,
-                images: secondaryImages,
-                variants: createdVariants,
-            };
-        });
-
-        return res.status(201).json({
-            success: true,
-            message: "Product created successfully",
-            data: result,
-        });
-    } catch (error) {
-        // Cleanup uploaded files on failure
-        uploadedFiles.forEach((file) => {
-            file?.path && fs.existsSync(file.path) && fs.unlinkSync(file.path);
-        });
-
-        if (error.message?.includes("already exists")) {
-            return res.status(409).json({
-                success: false,
-                message: error.message,
-            });
+      // Create variants + inventory
+      for (const variant of parsedVariants) {
+        if (!variant.sku || !variant.price) {
+          throw new Error("Each variant must have SKU and price");
         }
 
-        console.error("Create product error:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Internal Server Error",
+        const createdVariant = await tx.productVariant.create({
+          data: {
+            productId: product.id,
+            sku: variant.sku,
+            price: parseFloat(variant.price),
+            attributes: variant.attributes ?? null,
+          },
         });
-    }
+
+        await tx.inventory.create({
+          data: {
+            variantId: createdVariant.id,
+            quantity: variant.quantity ?? 0,
+            reserved: 0,
+          },
+        });
+      }
+
+      // Save images
+      if (uploadedImages.length > 0) {
+        await tx.productImage.createMany({
+          data: uploadedImages.map((img) => ({
+            ...img,
+            productId: product.id,
+          })),
+        });
+      }
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          action: "CREATE",
+          entity: "PRODUCT",
+          entityId: product.id,
+          metadata: {
+            name,
+            slug,
+            categoryId,
+            variantsCount: parsedVariants.length,
+          },
+        },
+      });
+
+      return product;
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Product created successfully",
+      data: result,
+    });
+  } catch (error) {
+    // ---------------------------
+    // Cleanup Cloudinary uploads if DB fails
+    // ---------------------------
+    await Promise.all(
+      uploadedImages.map((img) =>
+        deleteImage(img.publicId).catch(() => null)
+      )
+    );
+
+    console.error("Create product error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
 };
 
 // Update Product
 const updateProduct = async (req, res) => {
+    const userId = req?.user?.id;
     const { id } = req.params;
     const {
         name,
@@ -313,11 +339,10 @@ const updateProduct = async (req, res) => {
         brand,
         description,
         categoryId,
-        isActive,
         variants,
         removeImageIds,
     } = req.body;
-
+    const isActive = req.body.isActive === "true";
     const thumbnailFile = req.files?.thumbnail?.[0];
     const newImages = req.files?.images || [];
 
@@ -345,6 +370,10 @@ const updateProduct = async (req, res) => {
                 include: { variants: true },
             });
             if (!product) throw new Error("Product not found");
+            const tag =
+                typeof req.body.tag === "string"
+                    ? JSON.parse(req.body.tag)
+                    : req.body.tag;
 
             // 2️⃣ Update product fields
             await tx.product.update({
@@ -471,7 +500,7 @@ const updateProduct = async (req, res) => {
                     },
                     ipAddress: req.ip,
                     userAgent: req.headers["user-agent"],
-                    userId: req.user.id,
+                    userId: userId ?? null,
                 },
             });
 

@@ -42,6 +42,8 @@ const getAllProducts = async (req, res) => {
             name: p.name,
             description: p.description,
             slug: p.slug,
+            tag: p.tag,
+            brand: p.brand,
             isActive: p.isActive,
             category: p.category,
             categoryName: p.category.name,
@@ -120,6 +122,8 @@ const createProduct = async (req, res) => {
     const {
         name,
         description,
+        tag,
+        brand,
         categoryId,
         isActive = true,
         variants,
@@ -179,6 +183,8 @@ const createProduct = async (req, res) => {
             const product = await tx.product.create({
                 data: {
                     name,
+                    tag,
+                    brand,
                     slug: slugToUse,
                     description,
                     isActive,
@@ -303,6 +309,8 @@ const updateProduct = async (req, res) => {
     const { id } = req.params;
     const {
         name,
+        tag,
+        brand,
         description,
         categoryId,
         isActive,
@@ -343,6 +351,8 @@ const updateProduct = async (req, res) => {
                 where: { id },
                 data: {
                     name: name ?? product.name,
+                    tag: tag ?? product.tag,
+                    brand: brand ?? product.brand,
                     slug: slug ?? product.slug,
                     description: description ?? product.description,
                     isActive: isActive ?? product.isActive,

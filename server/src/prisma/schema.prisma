@@ -172,8 +172,9 @@ model Product {
   id          String  @id @default(uuid())
   name        String
   slug        String  @unique
-  description String
-  tag         String?
+  description String  @db.Text
+  tag         String[]
+  brand       String?
   isActive    Boolean @default(true)
 
   categoryId String
@@ -197,7 +198,7 @@ model ProductVariant {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   sku        String  @unique
-  price      Decimal
+  price      Decimal @db.Decimal(10, 2)
   attributes Json?
 
   inventory Inventory?
@@ -373,6 +374,8 @@ model Coupon {
   usageLimit  Int?
   usedCount   Int      @default(0)
   isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // =====================

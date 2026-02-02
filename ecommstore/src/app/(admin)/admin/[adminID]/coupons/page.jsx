@@ -1,8 +1,11 @@
+import Coupons from '@/components/admin/pages/Coupons'
 import React from 'react'
 
 const page = () => {
   return (
-    <div>coupons</div>
+    <div>
+      <Coupons />
+    </div>
   )
 }
 

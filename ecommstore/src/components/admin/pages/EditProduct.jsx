@@ -94,6 +94,7 @@ const EditProduct = () => {
             id: v.id,
             sku: v.sku,
             price: v.price,
+            attributesText: v.attributes,
             attributes: v.attributes,
             quantity: v.inventory?.quantity ?? 0,
             _delete: false,
@@ -136,6 +137,7 @@ const EditProduct = () => {
       {
         sku: "",
         price: "",
+        attributesText: "",
         attributes: null,
         quantity: 0,
         _delete: false,
@@ -226,7 +228,7 @@ const EditProduct = () => {
       formDataToSend.append("tag", JSON.stringify(formData.tag));
       formDataToSend.append("brand", formData.brand);
       formDataToSend.append("categoryId", formData.categoryId);
-      formDataToSend.append("isActive", formData.isActive);
+      formDataToSend.append("isActive", String(formData.isActive));
 
       // Append variants
       formDataToSend.append("variants", JSON.stringify(variants));
@@ -521,25 +523,29 @@ const EditProduct = () => {
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            value={
-                              variant.attributes
-                                ? JSON.stringify(variant.attributes)
-                                : ""
+  value={variant.attributesText}
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        setVariants((prev) =>
+                          prev.map((v, i) => {
+                            if (i !== index) return v;
+
+                            let parsed = null;
+                            try {
+                              parsed = value ? JSON.parse(value) : null;
+                            } catch {
+                              
                             }
-                            onChange={(e) => {
-                              try {
-                                const parsed = e.target.value
-                                  ? JSON.parse(e.target.value)
-                                  : null;
-                                handleVariantChange(
-                                  index,
-                                  "attributes",
-                                  parsed,
-                                );
-                              } catch (err) {
-                                // Invalid JSON, keep as string for now
-                              }
-                            }}
+
+                            return {
+                              ...v,
+                              attributesText: value, // ALWAYS update text
+                              attributes: parsed, // update only if valid
+                            };
+                          }),
+                        );
+                      }}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
                             placeholder='{"size":"M"}'
                           />

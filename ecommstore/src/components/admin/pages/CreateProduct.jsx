@@ -42,6 +42,7 @@ const CreateProduct = () => {
     {
       sku: "",
       price: "",
+      attributesText: "",
       attributes: null,
       quantity: 0,
     },
@@ -81,7 +82,7 @@ const CreateProduct = () => {
 
   const handleVariantChange = (index, field, value) => {
     setVariants((prev) =>
-      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v))
+      prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
     );
   };
 
@@ -176,7 +177,7 @@ const CreateProduct = () => {
       formDataToSend.append("tag", JSON.stringify(formData.tag));
       formDataToSend.append("brand", formData.brand);
       formDataToSend.append("categoryId", formData.categoryId);
-      formDataToSend.append("isActive", formData.isActive);
+      formDataToSend.append("isActive", String(formData.isActive));
 
       // Append variants
       formDataToSend.append("variants", JSON.stringify(variants));
@@ -199,7 +200,7 @@ const CreateProduct = () => {
             "Content-Type": "multipart/form-data",
           },
           withCredentials: true,
-        }
+        },
       );
 
       if (data.success) {
@@ -210,9 +211,7 @@ const CreateProduct = () => {
       }
     } catch (error) {
       console.error("Create product error:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to create product"
-      );
+      toast.error(error.response?.data?.message || "Failed to create product");
     } finally {
       setIsLoading(false);
     }
@@ -272,10 +271,17 @@ const CreateProduct = () => {
                 required
               >
                 <option value="">Select category</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
+               {categories.map((category) => (
+                  <>
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                    {category.children.map((child) => (
+                      <option key={child.id} value={child.id}>
+                        {child.name}
+                      </option>
+                    ))}
+                  </>
                 ))}
               </select>
             </div>
@@ -436,7 +442,7 @@ const CreateProduct = () => {
                         handleVariantChange(
                           index,
                           "quantity",
-                          parseInt(e.target.value) || 0
+                          parseInt(e.target.value) || 0,
                         )
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
@@ -450,20 +456,28 @@ const CreateProduct = () => {
                     </label>
                     <input
                       type="text"
-                      value={
-                        variant.attributes
-                          ? JSON.stringify(variant.attributes)
-                          : ""
-                      }
+                      value={variant.attributesText}
                       onChange={(e) => {
-                        try {
-                          const parsed = e.target.value
-                            ? JSON.parse(e.target.value)
-                            : null;
-                          handleVariantChange(index, "attributes", parsed);
-                        } catch (err) {
-                          // Invalid JSON, keep as string for now
-                        }
+                        const value = e.target.value;
+
+                        setVariants((prev) =>
+                          prev.map((v, i) => {
+                            if (i !== index) return v;
+
+                            let parsed = null;
+                            try {
+                              parsed = value ? JSON.parse(value) : null;
+                            } catch {
+                              
+                            }
+
+                            return {
+                              ...v,
+                              attributesText: value, // ALWAYS update text
+                              attributes: parsed, // update only if valid
+                            };
+                          }),
+                        );
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
                       placeholder='{"size":"M"}'

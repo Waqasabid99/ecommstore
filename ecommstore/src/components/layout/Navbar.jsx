@@ -44,8 +44,8 @@ const Navbar = () => {
 
   useEffect(() => {
    const fetechCategories = async () => {
-    const fetchedCategories = await getCategories();
-    setCategories(fetchedCategories.data);
+    const data = await getCategories();
+    setCategories(data);
    }
    fetechCategories();
   }, [])
@@ -160,7 +160,12 @@ const Navbar = () => {
                 <select className="absolute left-0 top-0 h-full px-4 pr-8 bg-black text-white rounded-l-full text-sm font-medium border-none outline-none appearance-none cursor-pointer">
                   <option>All Categories</option>
                   {categories?.map((category) => (
+                    <>   
                     <option value={category.name} key={category.id}>{category.name}</option>
+                    {categories?.children?.map((child) => (
+                      <option value={child.name} key={child.id}>{child.name}</option>
+                    ))}
+                    </>
                   ))}
                 </select>
                 <input

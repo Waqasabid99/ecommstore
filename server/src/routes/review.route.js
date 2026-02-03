@@ -14,23 +14,23 @@ import {
     bulkDeleteReviews,
 } from "../controllers/reviews.controller.js";
 
-const router = express.Router();
+const reviewRouter = express.Router();
 
 // Public routes
-router.get("/product/:productId", getProductReviews);
+reviewRouter.get("/product/:productId", getProductReviews);
 
 // User routes (requires login)
-router.use(verifyUser);
-router.post("/", createReview);
-router.get("/my-reviews", getMyReviews);
-router.get("/can-review/:productId", canReviewProduct);
-router.patch("/:id", updateReview);
-router.delete("/:id", deleteReview);
+reviewRouter.use(verifyUser);
+reviewRouter.post("/", createReview);
+reviewRouter.get("/my-reviews", getMyReviews);
+reviewRouter.get("/can-review/:productId", canReviewProduct);
+reviewRouter.patch("/:id", updateReview);
+reviewRouter.delete("/:id", deleteReview);
 
 // Admin routes
-router.get("/admin/all", requireAdmin, getAllReviews);
-router.get("/admin/stats", requireAdmin, getReviewStats);
-router.delete("/admin/:id", requireAdmin, adminDeleteReview);
-router.delete("/admin/bulk", requireAdmin, bulkDeleteReviews);
+reviewRouter.get("/admin/all", requireAdmin, getAllReviews);
+reviewRouter.get("/admin/stats", requireAdmin, getReviewStats);
+reviewRouter.delete("/admin/:id", requireAdmin, adminDeleteReview);
+reviewRouter.delete("/admin/bulk", requireAdmin, bulkDeleteReviews);
 
-export default router;
+export default reviewRouter;

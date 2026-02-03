@@ -5,21 +5,41 @@ import {
     verifyPassword,
 } from "../constants/constants.js";
 
-// Get all users with pagination
+// Get all users with pagination and search
 const getAllUsers = async (req, res) => {
     const take = Math.min(parseInt(req.query.take) || 10, 100);
     const skip = parseInt(req.query.skip) || 0;
+    const search = req.query.search || "";
 
     try {
+        // Build search filter
+        const searchFilter = search
+            ? {
+                  OR: [
+                      { userName: { contains: search, mode: "insensitive" } },
+                      { email: { contains: search, mode: "insensitive" } },
+                  ],
+              }
+            : {};
+
         const [users, total] = await prisma.$transaction([
             prisma.user.findMany({
-                where: { deletedAt: null },
+                where: {
+                    deletedAt: null,
+                    ...searchFilter,
+                },
+                include: {
+                    addresses: true, // Include addresses for order creation
+                },
                 take,
                 skip,
                 orderBy: { createdAt: "desc" },
             }),
             prisma.user.count({
-                where: { deletedAt: null },
+                where: {
+                    deletedAt: null,
+                    ...searchFilter,
+                },
             }),
         ]);
 
@@ -27,7 +47,10 @@ const getAllUsers = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            data: users.map(safeUser),
+            data: users.map((user) => ({
+                ...safeUser(user),
+                address: user.address, // Include addresses in response
+            })),
             pagination: {
                 total,
                 totalPages,
@@ -36,6 +59,7 @@ const getAllUsers = async (req, res) => {
             },
         });
     } catch (error) {
+        console.error("Get all users error:", error);
         res.status(500).json({
             success: false,
             message: "Internal server error",
@@ -66,8 +90,13 @@ const getSingleUser = async (req, res) => {
                 userId: id,
             },
         });
-        return res.status(200).json({ success: true, data: safeUser(user), address: userAddress });
+        return res.status(200).json({ 
+            success: true, 
+            data: safeUser(user), 
+            address: userAddress 
+        });
     } catch (error) {
+        console.error("Get single user error:", error);
         return res.status(500).json({
             success: false,
             message: "Internal server error",
@@ -165,6 +194,7 @@ const updateUser = async (req, res) => {
       data: safeUser(user),
     });
   } catch (error) {
+    console.error("Update user error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -228,6 +258,7 @@ const deleteUser = async (req, res) => {
       message: "User deleted successfully",
     });
   } catch (error) {
+    console.error("Delete user error:", error);
     if (error.code === "P2025") {
       return res.status(404).json({
         success: false,

@@ -1,8 +1,10 @@
-import React from 'react'
+import Orders from '@/components/admin/pages/Orders'
 
 const page = () => {
   return (
-    <div>orders</div>
+    <div>
+      <Orders />
+    </div>
   )
 }
 

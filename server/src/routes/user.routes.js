@@ -17,7 +17,7 @@ userRouter.patch("/update", verifyUser, updateUser);
 userRouter.delete("/delete", verifyUser, deleteUser);
 
 // Admin only update user
-userRouter.put("/update/:id", verifyUser, requireAdmin, updateUser);
+userRouter.patch("/update/:id", verifyUser, requireAdmin, updateUser);
 
 // Admin only delete user
 userRouter.delete("/delete/:id", verifyUser, requireAdmin, deleteUser);

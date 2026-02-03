@@ -18,7 +18,7 @@ const getAllProducts = async (req, res) => {
             ...(isActive !== undefined && { isActive: isActive === "true" }),
         };
 
-        const [products, total] = await prisma.$transaction([
+        const [products, total] = await Promise.all([
             prisma.product.findMany({
                 where: filters,
                 include: {
@@ -43,17 +43,20 @@ const getAllProducts = async (req, res) => {
             description: p.description,
             slug: p.slug,
             tag: p.tag,
-            brand: p.brand,
+            brand: p.brand ?? null,
             isActive: p.isActive,
             category: p.category,
-            categoryName: p.category.name,
-            thumbnail: p.images.find((i) => i.isMain)?.url || "",
+            categoryName: p.category?.name ?? null,
+            thumbnail:
+                p.images.find((i) => i.isMain)?.url || p.images[0]?.url || "",
             images: p.images.map((i) => i.url),
             variants: p.variants.map((v) => ({
                 id: v.id,
                 sku: v.sku,
                 price: v.price,
                 availableQty: v.inventory?.quantity ?? 0,
+                inStock: (v.inventory?.quantity ?? 0) > 0,
+                variantsCount: p.variants.length,
             })),
         }));
 
@@ -102,12 +105,12 @@ const getProductById = async (req, res) => {
                 success: false,
                 error: "Product not found",
             });
-        }   
+        }
         // Get Category
         const category = await prisma.category.findUnique({
             where: { id: product.categoryId },
         });
-        
+
         // Optional: frontend-friendly transformation
         const transformed = {
             id: product.id,
@@ -141,192 +144,192 @@ const getProductById = async (req, res) => {
 
 // Create product
 const createProduct = async (req, res) => {
-  const { name, description, brand, categoryId, variants } = req.body;
+    const { name, description, brand, categoryId, variants } = req.body;
 
-  const isActive = req.body.isActive === "true";
-  const thumbnailFile = req.files?.thumbnail?.[0] || null;
-  const secondaryImages = req.files?.images || [];
+    const isActive = req.body.isActive === "true";
+    const thumbnailFile = req.files?.thumbnail?.[0] || null;
+    const secondaryImages = req.files?.images || [];
 
-  if (!name || !categoryId) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing required fields",
-    });
-  }
-
-  // ---------------------------
-  // Parse tags
-  // ---------------------------
-  let tag = [];
-  try {
-    tag =
-      typeof req.body.tag === "string"
-        ? JSON.parse(req.body.tag)
-        : req.body.tag ?? [];
-  } catch {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid tag format",
-    });
-  }
-
-  // ---------------------------
-  // Parse variants (required)
-  // ---------------------------
-  let parsedVariants;
-  try {
-    parsedVariants = JSON.parse(variants);
-    if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
-      throw new Error();
-    }
-  } catch {
-    return res.status(400).json({
-      success: false,
-      message: "At least one product variant is required",
-    });
-  }
-
-  const slugBase = slugify(name, { lower: true, strict: true });
-
-  // ---------------------------
-  // 1️⃣ Upload images FIRST (outside transaction)
-  // ---------------------------
-  const uploadedImages = [];
-
-  try {
-    if (thumbnailFile) {
-      const res = await uploadBuffer(thumbnailFile.buffer, "products");
-      uploadedImages.push({
-        url: res.secure_url,
-        publicId: res.public_id,
-        isMain: true,
-      });
+    if (!name || !categoryId) {
+        return res.status(400).json({
+            success: false,
+            message: "Missing required fields",
+        });
     }
 
-    for (const img of secondaryImages) {
-      const res = await uploadBuffer(img.buffer, "products");
-      uploadedImages.push({
-        url: res.secure_url,
-        publicId: res.public_id,
-        isMain: false,
-      });
+    // ---------------------------
+    // Parse tags
+    // ---------------------------
+    let tag = [];
+    try {
+        tag =
+            typeof req.body.tag === "string"
+                ? JSON.parse(req.body.tag)
+                : (req.body.tag ?? []);
+    } catch {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid tag format",
+        });
     }
-  } catch (err) {
-    console.error("Image upload failed:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Image upload failed",
-    });
-  }
 
-  // ---------------------------
-  // 2️⃣ Database transaction (DB ONLY)
-  // ---------------------------
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      // Validate category
-      const category = await tx.category.findUnique({
-        where: { id: categoryId },
-      });
+    // ---------------------------
+    // Parse variants (required)
+    // ---------------------------
+    let parsedVariants;
+    try {
+        parsedVariants = JSON.parse(variants);
+        if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+            throw new Error();
+        }
+    } catch {
+        return res.status(400).json({
+            success: false,
+            message: "At least one product variant is required",
+        });
+    }
 
-      if (!category) {
-        throw new Error("Category not found");
-      }
+    const slugBase = slugify(name, { lower: true, strict: true });
 
-      // Ensure slug uniqueness
-      let slug = slugBase;
-      const exists = await tx.product.findUnique({ where: { slug } });
-      if (exists) {
-        slug = `${slugBase}-${Math.floor(Math.random() * 10000)}`;
-      }
+    // ---------------------------
+    // 1️⃣ Upload images FIRST (outside transaction)
+    // ---------------------------
+    const uploadedImages = [];
 
-      // Create product
-      const product = await tx.product.create({
-        data: {
-          name,
-          description,
-          tag,
-          brand,
-          slug,
-          isActive,
-          categoryId,
-        },
-      });
-
-      // Create variants + inventory
-      for (const variant of parsedVariants) {
-        if (!variant.sku || !variant.price) {
-          throw new Error("Each variant must have SKU and price");
+    try {
+        if (thumbnailFile) {
+            const res = await uploadBuffer(thumbnailFile.buffer, "products");
+            uploadedImages.push({
+                url: res.secure_url,
+                publicId: res.public_id,
+                isMain: true,
+            });
         }
 
-        const createdVariant = await tx.productVariant.create({
-          data: {
-            productId: product.id,
-            sku: variant.sku,
-            price: parseFloat(variant.price),
-            attributes: variant.attributes ?? null,
-          },
+        for (const img of secondaryImages) {
+            const res = await uploadBuffer(img.buffer, "products");
+            uploadedImages.push({
+                url: res.secure_url,
+                publicId: res.public_id,
+                isMain: false,
+            });
+        }
+    } catch (err) {
+        console.error("Image upload failed:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Image upload failed",
         });
+    }
 
-        await tx.inventory.create({
-          data: {
-            variantId: createdVariant.id,
-            quantity: variant.quantity ?? 0,
-            reserved: 0,
-          },
-        });
-      }
-
-      // Save images
-      if (uploadedImages.length > 0) {
-        await tx.productImage.createMany({
-          data: uploadedImages.map((img) => ({
-            ...img,
-            productId: product.id,
-          })),
-        });
-      }
-
-      // Audit log
-      await tx.auditLog.create({
-        data: {
-          action: "CREATE",
-          entity: "PRODUCT",
-          entityId: product.id,
-          metadata: {
-            name,
-            slug,
-            categoryId,
-            variantsCount: parsedVariants.length,
-          },
-        },
-      });
-
-      return product;
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Product created successfully",
-      data: result,
-    });
-  } catch (error) {
     // ---------------------------
-    // Cleanup Cloudinary uploads if DB fails
+    // 2️⃣ Database transaction (DB ONLY)
     // ---------------------------
-    await Promise.all(
-      uploadedImages.map((img) =>
-        deleteImage(img.publicId).catch(() => null)
-      )
-    );
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            // Validate category
+            const category = await tx.category.findUnique({
+                where: { id: categoryId },
+            });
 
-    console.error("Create product error:", error);
+            if (!category) {
+                throw new Error("Category not found");
+            }
 
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Internal Server Error",
-    });
-  }
+            // Ensure slug uniqueness
+            let slug = slugBase;
+            const exists = await tx.product.findUnique({ where: { slug } });
+            if (exists) {
+                slug = `${slugBase}-${Math.floor(Math.random() * 10000)}`;
+            }
+
+            // Create product
+            const product = await tx.product.create({
+                data: {
+                    name,
+                    description,
+                    tag,
+                    brand,
+                    slug,
+                    isActive,
+                    categoryId,
+                },
+            });
+
+            // Create variants + inventory
+            for (const variant of parsedVariants) {
+                if (!variant.sku || !variant.price) {
+                    throw new Error("Each variant must have SKU and price");
+                }
+
+                const createdVariant = await tx.productVariant.create({
+                    data: {
+                        productId: product.id,
+                        sku: variant.sku,
+                        price: parseFloat(variant.price),
+                        attributes: variant.attributes ?? null,
+                    },
+                });
+
+                await tx.inventory.create({
+                    data: {
+                        variantId: createdVariant.id,
+                        quantity: variant.quantity ?? 0,
+                        reserved: 0,
+                    },
+                });
+            }
+
+            // Save images
+            if (uploadedImages.length > 0) {
+                await tx.productImage.createMany({
+                    data: uploadedImages.map((img) => ({
+                        ...img,
+                        productId: product.id,
+                    })),
+                });
+            }
+
+            // Audit log
+            await tx.auditLog.create({
+                data: {
+                    action: "CREATE",
+                    entity: "PRODUCT",
+                    entityId: product.id,
+                    metadata: {
+                        name,
+                        slug,
+                        categoryId,
+                        variantsCount: parsedVariants.length,
+                    },
+                },
+            });
+
+            return product;
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: "Product created successfully",
+            data: result,
+        });
+    } catch (error) {
+        // ---------------------------
+        // Cleanup Cloudinary uploads if DB fails
+        // ---------------------------
+        await Promise.all(
+            uploadedImages.map((img) =>
+                deleteImage(img.publicId).catch(() => null)
+            )
+        );
+
+        console.error("Create product error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Internal Server Error",
+        });
+    }
 };
 
 // Update Product

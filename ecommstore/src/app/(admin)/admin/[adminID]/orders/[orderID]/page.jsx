@@ -1,9 +1,9 @@
-import Settings from '@/components/admin/pages/Settings'
+import ViewOrder from "@/components/admin/pages/ViewOrder"
 
 const page = () => {
   return (
     <div>
-      <Settings />
+      <ViewOrder />
     </div>
   )
 }

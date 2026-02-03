@@ -34,32 +34,34 @@ const ShopPage = ({ products, categories }) => {
   const searchParam = useSearchParams();
   const queryCategory = searchParam.get("category");
 
-useEffect(() => {
-  if (queryCategory) {
-    setSelectedCategories(
-      queryCategory.split(",").map((c) => c.toLowerCase())
-    );
-  }
-}, [queryCategory]);
+  useEffect(() => {
+    if (queryCategory) {
+      setSelectedCategories(
+        queryCategory.split(",").map((c) => c.toLowerCase()),
+      );
+    }
+  }, [queryCategory]);
 
   // Extract unique brands from products
   const brands = useMemo(() => {
     const brandSet = new Set();
     products.forEach((product) => {
-      const brand = product.name.split(" ")[0];
+      const brand = product.brand;
       if (brand) brandSet.add(brand);
     });
     return Array.from(brandSet).sort();
   }, [products]);
 
   // Get max price from products
-  const maxPrice = useMemo(() => {
-    if (products.length === 0) return 50000;
-    return (
-      Math.ceil(Math.max(...products.map((p) => parseFloat(p.price))) / 1000) *
-      1000
-    );
-  }, [products]);
+const maxPrice = useMemo(() => {
+  if (!products.length) return 50000;
+
+  const prices = products.flatMap((p) =>
+    p.variants.map((v) => Number(v.price)),
+  );
+
+  return Math.ceil(Math.max(...prices) / 1000) * 1000;
+}, [products]);
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
@@ -82,22 +84,30 @@ useEffect(() => {
 
     // Filter by price
     filtered = filtered.filter((product) => {
-      const price = product.variants?.map((v) => v.price);
-      return price >= priceRange[0] && price <= priceRange[1];
+      const prices = product.variants?.map((v) => Number(v.price)) ?? [];
+      if (!prices.length) return false;
+
+      const minPrice = Math.min(...prices);
+      return minPrice >= priceRange[0] && minPrice <= priceRange[1];
     });
 
     // Filter by stock
     if (showInStock) {
-      filtered = filtered.filter((product) => product.quantity > 0);
+      filtered = filtered.filter((product) =>
+        product.variants?.some((v) => v.availableQty > 0),
+      );
     }
+    const getMinPrice = (p) =>
+      Math.min(...p.variants.map((v) => Number(v.price)));
 
     // Sort products
     switch (sortBy) {
       case "price-low":
-        filtered.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+        filtered.sort((a, b) => getMinPrice(a) - getMinPrice(b));
         break;
+
       case "price-high":
-        filtered.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+        filtered.sort((a, b) => getMinPrice(b) - getMinPrice(a));
         break;
       case "newest":
         filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -119,13 +129,13 @@ useEffect(() => {
     sortBy,
   ]);
 
-const toggleCategory = (categorySlug) => {
-  setSelectedCategories((prev) =>
-    prev.includes(categorySlug)
-      ? prev.filter((c) => c !== categorySlug)
-      : [...prev, categorySlug],
-  );
-};
+  const toggleCategory = (categorySlug) => {
+    setSelectedCategories((prev) =>
+      prev.includes(categorySlug)
+        ? prev.filter((c) => c !== categorySlug)
+        : [...prev, categorySlug],
+    );
+  };
 
   const toggleBrand = (brand) => {
     setSelectedBrands((prev) =>
@@ -154,7 +164,7 @@ const toggleCategory = (categorySlug) => {
     params.set("limit", limit);
 
     if (selectedCategories.length)
-      params.set("categoryId", selectedCategories.join(",")); // adjust if backend supports multiple
+      params.set("categorySlug", selectedCategories.join(","));
 
     if (selectedBrands.length) params.set("brands", selectedBrands.join(",")); // optional if backend supports
 
@@ -304,6 +314,31 @@ const toggleCategory = (categorySlug) => {
                   </div>
                   <span className="text-xs text-(--text-secondary)">
                     ({category._count?.products || 0})
+                  </span>
+                </label>
+              ))}
+              {categories.children?.map((child) => (
+                <label
+                  key={child.id}
+                  className="flex items-center justify-between cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.includes(
+                        child.slug?.toLowerCase(),
+                      )}
+                      onChange={() =>
+                        toggleCategory(child.slug?.toLowerCase())
+                      }
+                      className="w-4 h-4 rounded border-gray-300 text-(--color-brand-primary) focus:ring-2 focus:ring-(--color-brand-primary)"
+                    />
+                    <span className="text-sm text-(--text-primary) group-hover:text-(--color-brand-primary)">
+                      {child.name}
+                    </span>
+                  </div>
+                  <span className="text-xs text-(--text-secondary)">
+                    {/* ({category._count?.products || 0}) */}
                   </span>
                 </label>
               ))}

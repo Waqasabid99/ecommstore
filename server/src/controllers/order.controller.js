@@ -2,60 +2,77 @@ import { prisma } from "../config/prisma.js";
 
 // Get order by ID
 const getOrderById = async (req, res) => {
-    const userId = req.user?.id;
-    const { orderId } = req.params;
+  const userId = req.user?.id;
+  const { orderId } = req.params;
 
-    try {
-        const order = await prisma.order.findFirst({
-            where: {
-                id: orderId,
-                userId,
-                deletedAt: null,
-            },
-            include: {
-                items: {
-                    include: {
-                        variant: {
-                            include: {
-                                product: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        slug: true,
-                                        images: {
-                                            where: { isMain: true },
-                                            take: 1,
-                                        },
-                                    },
-                                },
-                            },
-                        },
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      error: "Unauthorized",
+    });
+  }
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            variant: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    images: {
+                      where: { isMain: true },
+                      take: 1,
                     },
+                  },
                 },
-                payment: true,
-                refunds: true,
-                returns: true,
+              },
             },
-        });
+          },
+        },
+        payment: {
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            provider: true,
+            createdAt: true,
+          },
+        },
+        user: {
+          select: {
+            userName: true,
+            email: true,
+          },
+        },
+        refunds: true,
+        returns: true,
+      },
+    });
 
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                error: "Order not found",
-            });
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: order,
-        });
-    } catch (error) {
-        console.error("Get order error:", error);
-        return res.status(500).json({
-            success: false,
-            error: "Internal Server Error",
-        });
+    if (!order || order.deletedAt) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found",
+      });
     }
+
+    return res.status(200).json({
+      success: true,
+      data: order,
+    });
+  } catch (error) {
+    console.error("Get order error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 };
 
 // Get all orders
@@ -100,6 +117,12 @@ const getAllOrders = async (req, res) => {
                             amount: true,
                         },
                     },
+                    user: {
+                        select: {
+                            userName: true,
+                            email: true,
+                        },
+                    },
                 },
                 orderBy: { createdAt: "desc" },
                 skip: Number(skip),
@@ -107,7 +130,7 @@ const getAllOrders = async (req, res) => {
             }),
             prisma.order.count({ where }),
         ]);
-
+        
         return res.status(200).json({
             success: true,
             data: orders,
@@ -178,21 +201,19 @@ const getUserOrders = async (req, res) => {
             prisma.order.count({ where }),
         ]);
 
-        const { totalSpent, ...statusCounts } = orders.reduce(
-        (acc, order) => {
+        const { totalSpent, ...statusCounts } = orders.reduce((acc, order) => {
             acc[order.status] = (acc[order.status] || 0) + 1;
-            acc.totalSpent = (acc.totalSpent || 0) + order?.payment?.amount || 0;
+            acc.totalSpent =
+                (acc.totalSpent || 0) + order?.payment?.amount || 0;
             return acc;
-        },
-        {}
-        );
+        }, {});
 
         const totalOrders = orders.length;
         const pendingOrders = statusCounts.PENDING || 0;
         const deliveredOrders = statusCounts.DELIVERED || 0;
         const cancelledOrders = statusCounts.CANCELLED || 0;
         const refundedOrders = statusCounts.REFUNDED || 0;
-        const stats = [ 
+        const stats = [
             {
                 label: "Total Orders",
                 value: totalOrders,
@@ -220,9 +241,9 @@ const getUserOrders = async (req, res) => {
             {
                 label: "Average Order Value",
                 value: totalSpent / totalOrders,
-            }
-        ]
-        
+            },
+        ];
+
         return res.status(200).json({
             success: true,
             data: orders,
@@ -349,17 +370,16 @@ const cancelOrder = async (req, res) => {
     const userId = req.user?.id;
     const { orderId } = req.params;
     const { reason } = req.body;
-
+    console.log(orderId, reason)
     try {
-        const order = await prisma.order.findFirst({
+        const order = await prisma.order.findUnique({
             where: {
                 id: orderId,
-                userId,
                 deletedAt: null,
             },
             include: { items: true, payment: true },
         });
-
+        console.log(order)
         if (!order) {
             return res.status(404).json({
                 success: false,
@@ -437,4 +457,10 @@ const cancelOrder = async (req, res) => {
     }
 };
 
-export { getUserOrders, getAllOrders, getOrderById, updateOrderStatus, cancelOrder };
+export {
+    getUserOrders,
+    getAllOrders,
+    getOrderById,
+    updateOrderStatus,
+    cancelOrder,
+};

@@ -23,6 +23,7 @@ const getAllProducts = async (req, res) => {
                 where: filters,
                 include: {
                     category: { select: { id: true, name: true, slug: true } },
+                    reviews: true,
                     variants: {
                         where: { deletedAt: null },
                         include: { inventory: true },
@@ -58,8 +59,14 @@ const getAllProducts = async (req, res) => {
                 inStock: (v.inventory?.quantity ?? 0) > 0,
                 variantsCount: p.variants.length,
             })),
+            reviews: p.reviews.map((r) => ({
+                id: r.id,
+                rating: r.rating,
+                comment: r.comment,
+                user: r.user,
+            })),
         }));
-
+        console.log(transformed)
         res.status(200).json({
             success: true,
             data: transformed,
@@ -90,6 +97,7 @@ const getProductById = async (req, res) => {
                 deletedAt: null,
             },
             include: {
+                reviews: true,
                 images: true,
                 variants: {
                     where: { deletedAt: null },
@@ -127,8 +135,14 @@ const getProductById = async (req, res) => {
             createdAt: product.createdAt,
             updatedAt: product.updatedAt,
             variants: product.variants,
+            reviews: product.reviews.map((r) => ({
+                id: r.id,
+                rating: r.rating,
+                comment: r.comment,
+                user: r.user,
+            })),
         };
-
+        console.log(transformed)
         res.status(200).json({
             success: true,
             data: transformed,
@@ -540,7 +554,6 @@ const updateProduct = async (req, res) => {
 };
 
 // Delete Product (Soft Delete)
-
 const deleteProduct = async (req, res) => {
     const { id } = req.params;
 

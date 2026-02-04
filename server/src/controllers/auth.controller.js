@@ -20,13 +20,13 @@ const registerUser = async (req, res) => {
         });
     }
     try {
-        const existingUser = await prisma.user.findUnique({ where: { email } });
+        const existingUser = await prisma.user.findUnique({ where: { email, deletedAt: null } });
         if (existingUser) {
             res.status(409).json({
                 success: false,
                 message: "Email already in use",
             });
-        }
+        };
         const user = await prisma.user.create({
             data: {
                 email,
@@ -57,7 +57,7 @@ const loginUser = async (req, res) => {
     const { email, password } = req?.body;
     console.log(email, password);
     try {
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({ where: { email, deletedAt: null } });
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -125,7 +125,7 @@ const resetPassword = async (req, res) => {
     const { id } = req?.user;
     const { oldPassword, newPassword } = req?.body;
     try {
-        const user = await prisma.user.findUnique({ where: { id } });
+        const user = await prisma.user.findUnique({ where: { id, deletedAt: null } });
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -167,7 +167,7 @@ const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     try {
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({ where: { email, deletedAt: null } });
 
         if (!user) {
             return res.status(200).json({

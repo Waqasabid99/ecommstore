@@ -393,7 +393,7 @@ const getProductReviews = async (req, res) => {
     }[sortBy] || { createdAt: "desc" };
 
     try {
-        const [reviews, total, ratingStats] = await prisma.$transaction([
+        const [reviews, total, ratingStats] = await Promise.all([
             prisma.review.findMany({
                 where: { productId },
                 include: {

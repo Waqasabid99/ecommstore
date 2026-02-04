@@ -1,6 +1,6 @@
 
 const ProductRating = ({ 
-  rating = 0, 
+  rating, 
   maxRating = 5, 
   size = 'md',
   showCount = false,

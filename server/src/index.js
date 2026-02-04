@@ -15,6 +15,7 @@ import couponRouter from "./routes/coupon.routes.js";
 import addressRouter from "./routes/address.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import reviewRouter from "./routes/review.route.js";
+import returnRouter from "./routes/return.routes.js";
 const app = express();
 const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
 
@@ -46,6 +47,7 @@ app.use("/coupons", couponRouter);
 app.use("/checkout", checkoutRouter);
 app.use("/orders", orderRouter);
 app.use("/reviews", reviewRouter);
+app.use("/retruns-refunds", returnRouter);
 app.use("/dashboard", dashboardRouter);
 app.use("/seed", seedRouter);
 

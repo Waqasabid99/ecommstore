@@ -18,7 +18,10 @@ import {
   X,
   Plus,
   Edit,
-  ShoppingBag
+  ShoppingBag,
+  Star,
+  RefreshCcw,
+  CircleDollarSign
 } from 'lucide-react';
 
 const UserSidebar = () => {
@@ -42,11 +45,21 @@ const UserSidebar = () => {
     href: `/user/${id}/shop`,
     icon: <ShoppingBag className="w-5 h-5" />,
   },
-  // {
-  //   name: 'Profile',
-  //   href: `/user/${id}/profile`,
-  //   icon: <Users className="w-5 h-5" />,
-  // },
+  {
+    name: 'Reviews',
+    href: `/user/${id}/reviews`,
+    icon: <Star className="w-5 h-5" />,
+  },
+  {
+    name: 'Returns',
+    href: `/user/${id}/returns`,
+    icon: <RefreshCcw className="w-5 h-5" />,
+  },
+  {
+    name: 'Refunds', 
+    href: `/user/${id}/refunds`,
+    icon: <CircleDollarSign className="w-5 h-5" />,
+  },
   {
     name: 'Settings',
     href: `/user/${id}/settings`,

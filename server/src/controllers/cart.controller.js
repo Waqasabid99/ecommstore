@@ -1,11 +1,8 @@
 import { prisma } from "../config/prisma.js";
 import Decimal from "decimal.js";
 
-/**
- * Get user's cart with full details
- * GET /api/cart
- */
 
+// Get cart
 const getCart = async (req, res) => {
   const userId = req.user.id;
 
@@ -108,7 +105,7 @@ const getCart = async (req, res) => {
         name: item.name,
         description: item.description,
         sku: item.sku,
-
+        
         quantity: item.quantity,
         price: itemPrice.toFixed(2),
         itemTotal: itemTotal.toFixed(2),
@@ -119,6 +116,7 @@ const getCart = async (req, res) => {
           id: product?.id,
           slug: product?.slug,
           category: product?.category,
+          brand: product?.brand,
         },
 
         availableStock,

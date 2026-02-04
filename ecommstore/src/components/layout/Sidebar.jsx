@@ -17,7 +17,10 @@ import {
   Menu,
   X,
   Plus,
-  Edit
+  Edit,
+  Star,
+  RefreshCcw,
+  CircleDollarSign
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -47,14 +50,14 @@ const Sidebar = () => {
       { name: 'Add Product', href: `/admin/${adminID}/products/new`, icon: <Plus className="w-4 h-4" /> },
     ],
   },
-  {
-    name: 'Blog',
-    href: `/admin/${adminID}/blog`,
-    icon: <FileText className="w-5 h-5" />,
-    subItems: [
-      { name: 'Add Blog Post', href: `/admin/${adminID}/blog/add`, icon: <Plus className="w-4 h-4" /> },
-    ],
-  },
+  // {
+  //   name: 'Blog',
+  //   href: `/admin/${adminID}/blog`,
+  //   icon: <FileText className="w-5 h-5" />,
+  //   subItems: [
+  //     { name: 'Add Blog Post', href: `/admin/${adminID}/blog/add`, icon: <Plus className="w-4 h-4" /> },
+  //   ],
+  // },
   {
     name: 'Coupons',
     href: `/admin/${adminID}/coupons`,
@@ -71,12 +74,29 @@ const Sidebar = () => {
     icon: <ShoppingCart className="w-5 h-5" />,
   },
   {
+    name: 'Reviews',
+    href: `/admin/${adminID}/reviews`,
+    icon: <Star className="w-5 h-5" />,
+  },
+  {
+    name: 'Returns',
+    href: `/admin/${adminID}/returns`,
+    icon: <RefreshCcw className="w-5 h-5" />,
+    subItems: [
+      { name: 'Statistics', href: `/admin/${adminID}/returns/stats`, icon: <Plus className="w-4 h-4" /> },
+    ]
+  },
+  {
+    name: 'Refunds',
+    href: `/admin/${adminID}/refunds`,
+    icon: <CircleDollarSign className="w-5 h-5" />,
+  },
+  {
     name: 'Settings',
     href: `/admin/${adminID}/settings`,
     icon: <Settings className="w-5 h-5" />,
   },
 ];
-
 
   const toggleExpanded = (itemName) => {
     setExpandedItems(prev =>

@@ -30,7 +30,7 @@ const Cart = () => {
   } = useCartStore();
   const { totalQuantity, subtotal } = getCartSummary();
   const cartItems = getCartItems();
-
+  console.log(cartItems)
   const updateQuantity = async (itemId, currentQty, delta) => {
     const newQty = currentQty + delta;
     if (newQty < 1 || newQty > 99) return;
@@ -165,7 +165,7 @@ const Cart = () => {
                     <p className="text-(--text-secondary) text-[10px] sm:text-xs hidden sm:block">
                       Brand:{" "}
                       <span className="font-normal text-(--text-primary)">
-                        {item.brand || "Not Specified"}
+                        {item.product?.brand || "Not Specified"}
                       </span>{" "}
                       | SKU:{" "}
                       <span className="font-normal text-(--text-primary)">

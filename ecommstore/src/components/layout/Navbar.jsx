@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Navlinks } from "@/lib/utils";
+import { Navlinks, renderCategories } from "@/lib/utils";
 import useAuth from "@/hooks/useAuth";
 import useAuthStore from "@/store/authStore";
 import { getCategories } from "@/lib/api/category";
@@ -29,7 +29,7 @@ const Navbar = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const { logout, checkAuth } = useAuthStore();
-  const { isAuthenticated, user, } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const { getCartItems, getCartSummary } = useCartStore();
   const cart = useCartStore((state) => state.cart);
@@ -43,12 +43,12 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-   const fetechCategories = async () => {
-    const data = await getCategories();
-    setCategories(data);
-   }
-   fetechCategories();
-  }, [])
+    const fetechCategories = async () => {
+      const data = await getCategories();
+      setCategories(data);
+    };
+    fetechCategories();
+  }, []);
 
   const promoMessages = [
     "For A Limited Time Only! Shop Now",
@@ -73,9 +73,9 @@ const Navbar = () => {
   const handleLogout = async () => {
     await logout();
     setOpenProfileDropDown(false);
-      navigate.push("/");
+    navigate.push("/");
   };
-
+  console.log(categories);
   return (
     <nav className="w-full bg-white border-b border-(--border-default) mb-5 sticky top-0 left-0 z-50">
       {/* Top Bar */}
@@ -158,13 +158,8 @@ const Navbar = () => {
             <div className="hidden md:flex flex-1 max-w-2xl mx-4 lg:mx-8">
               <div className="relative w-full">
                 <select className="absolute left-0 top-0 h-full px-4 pr-8 bg-black text-white rounded-l-full text-sm font-medium border-none outline-none appearance-none cursor-pointer">
-                  <option>All Categories</option>
-                  {categories?.map((category) => (
-                    <option value={category.name} key={category.id}>{category.name}</option>
-                  ))}
-                  {categories?.children?.map((child) => (
-                    <option value={child.name} key={child.id}>{child.name}</option>
-                  ))}
+                  <option value="">All Categories</option>
+                  {renderCategories(categories)}
                 </select>
                 <input
                   type="text"
@@ -191,7 +186,7 @@ const Navbar = () => {
               <div className="relative">
                 <button
                   onClick={() => {
-                    setIsCartOpen(!isCartOpen)
+                    setIsCartOpen(!isCartOpen);
                     getCartItems();
                   }}
                   className="flex items-center border gap-2 sm:gap-3 md:border lg:border text-black px-3 sm:px-4 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all group"
@@ -203,7 +198,7 @@ const Navbar = () => {
                   <div className="md:group-hover:text-(--text-inverse) md:group-hover:border-(--border-default) lg:group-hover:text-(--text-inverse) hidden sm:group-hover:text-white sm:flex flex-col items-start">
                     <span className="text-xs opacity-80">Total</span>
                     <span className="text-sm font-semibold">
-                      Rs. {subtotal ?? 0.00}
+                      Rs. {subtotal ?? 0.0}
                     </span>
                   </div>
                 </button>
@@ -219,7 +214,7 @@ const Navbar = () => {
                       <div className="bg-black text-white px-4 py-3">
                         <h3 className="font-semibold text-lg">Shopping Cart</h3>
                         <p className="text-sm opacity-80">
-                          {cartItems? itemCount : "0"} items
+                          {cartItems ? itemCount : "0"} items
                         </p>
                       </div>
                       <div className="max-h-96 overflow-y-auto">
@@ -228,20 +223,22 @@ const Navbar = () => {
                             key={item.id}
                             className="px-4 py-3 border-b border-(--border-default) hover:bg-gray-50 transition-colors"
                           >
-                            <Link href={`/shop/products/${item?.product?.slug}`}>
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <h4 className="font-medium text-sm text-(--text-primary)">
-                                  {item.name}
-                                </h4>
-                                <p className="text-xs text-(--text-secondary) mt-1">
-                                  Rs. {item?.price || "0.00"}
-                                </p>
+                            <Link
+                              href={`/shop/products/${item?.product?.slug}`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-sm text-(--text-primary)">
+                                    {item.name}
+                                  </h4>
+                                  <p className="text-xs text-(--text-secondary) mt-1">
+                                    Rs. {item?.price || "0.00"}
+                                  </p>
+                                </div>
+                                <span className="text-sm font-semibold text-(--text-primary)">
+                                  ×{item?.quantity || "0"}
+                                </span>
                               </div>
-                              <span className="text-sm font-semibold text-(--text-primary)">
-                                ×{item?.quantity || "0"}
-                              </span>
-                            </div>
                             </Link>
                           </div>
                         ))}
@@ -252,10 +249,13 @@ const Navbar = () => {
                             Total:
                           </span>
                           <span className="text-xl font-bold text-(--color-brand-primary)">
-                            Rs. {subtotal ?? 0.00}
+                            Rs. {subtotal ?? 0.0}
                           </span>
                         </div>
-                        <Link href={'/cart'} className="w-full flex justify-center bg-black text-white py-3 rounded-full font-semibold hover:bg-(--btn-bg-hover) transition-colors">
+                        <Link
+                          href={"/cart"}
+                          className="w-full flex justify-center bg-black text-white py-3 rounded-full font-semibold hover:bg-(--btn-bg-hover) transition-colors"
+                        >
                           View Cart
                         </Link>
                       </div>
@@ -292,7 +292,11 @@ const Navbar = () => {
                         </div>
                         <div className="py-2">
                           <Link
-                            href={user?.role === "ADMIN" ? `/admin/${user?.id}` : `/user/${user?.id}`}
+                            href={
+                              user?.role === "ADMIN"
+                                ? `/admin/${user?.id}`
+                                : `/user/${user?.id}`
+                            }
                             className="flex items-center gap-3 px-4 py-2.5 text-(--text-primary) hover:bg-gray-50 transition-colors"
                             onClick={() => setOpenProfileDropDown(false)}
                           >

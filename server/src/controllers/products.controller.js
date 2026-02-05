@@ -23,7 +23,6 @@ const getAllProducts = async (req, res) => {
                 where: filters,
                 include: {
                     category: { select: { id: true, name: true, slug: true } },
-                    reviews: true,
                     variants: {
                         where: { deletedAt: null },
                         include: { inventory: true },
@@ -37,35 +36,61 @@ const getAllProducts = async (req, res) => {
             prisma.product.count({ where: filters }),
         ]);
 
+        const productIds = products.map(p => p.id);
+
+        const ratings = await prisma.review.groupBy({
+        by: ["productId"],
+        where: {
+            productId: { in: productIds },
+        },
+        _avg: { rating: true },
+        _count: { id: true },
+        });
+
+        const ratingMap = new Map(
+        ratings.map(r => [
+            r.productId,
+            {
+            average: Number(r._avg.rating ?? 0),
+            count: r._count.id,
+            }
+        ])
+        );
+
         // Optional: frontend-friendly transformation
-        const transformed = products.map((p) => ({
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            slug: p.slug,
-            tag: p.tag,
-            brand: p.brand ?? null,
-            isActive: p.isActive,
-            category: p.category,
-            categoryName: p.category?.name ?? null,
-            thumbnail:
-                p.images.find((i) => i.isMain)?.url || p.images[0]?.url || "",
-            images: p.images.map((i) => i.url),
-            variants: p.variants.map((v) => ({
-                id: v.id,
-                sku: v.sku,
-                price: v.price,
-                availableQty: v.inventory?.quantity ?? 0,
-                inStock: (v.inventory?.quantity ?? 0) > 0,
-                variantsCount: p.variants.length,
-            })),
-            reviews: p.reviews.map((r) => ({
-                id: r.id,
-                rating: r.rating,
-                comment: r.comment,
-                user: r.user,
-            })),
-        }));
+        const transformed = products.map((p) => {
+            const rating = ratingMap.get(p.id) ?? { average: 0, count: 0 };
+            return {
+                id: p.id,
+                name: p.name,
+                description: p.description,
+                slug: p.slug,
+                tag: p.tag,
+                brand: p.brand ?? null,
+                isActive: p.isActive,
+                category: p.category,
+                categoryName: p.category?.name ?? null,
+                thumbnail:
+                    p.images.find((i) => i.isMain)?.url || p.images[0]?.url || "",
+                images: p.images.map((i) => i.url),
+                variants: p.variants.map((v) => ({
+                    id: v.id,
+                    sku: v.sku,
+                    price: v.price,
+                    availableQty: v.inventory?.quantity ?? 0,
+                    inStock: (v.inventory?.quantity ?? 0) > 0,
+                    variantsCount: p.variants.length,
+                })),
+                averageRating: Number(rating.average.toFixed(1)),
+                ratingCount: rating.count,
+                // reviews: p.reviews.map((r) => ({
+                //     id: r.id,
+                //     rating: r.rating,
+                //     comment: r.comment,
+                //     user: r.user,
+                // })),
+            }
+        });
         console.log(transformed)
         res.status(200).json({
             success: true,

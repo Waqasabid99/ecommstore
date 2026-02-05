@@ -27,6 +27,7 @@ import { baseUrl } from "@/lib/utils";
 import axios from "axios";
 import { toast } from "react-toastify";
 import RatingInput from "../ui/RatingInput";
+import StarRating from "../ui/StarRating";
 
 // Product Page
 const SingleProductPage = ({ products }) => {
@@ -165,23 +166,6 @@ console.log(reviews)
     thumbStart + THUMBNAILS_PER_VIEW
   );
 
-  const getRatingStars = (rating) => {
-    return (
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            size={16}
-            className={
-              star <= rating
-                ? "fill-yellow-400 text-yellow-400"  : "text-gray-300"  
-            }
-          />
-        ))}
-      </div>
-    );
-  };
-
   if (!product) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -287,11 +271,9 @@ console.log(reviews)
 
               {/* Rating */}
               <div className="flex items-center gap-4 pb-4 border-b border-(--border-default)">
-                <ProductRating
-                  rating={product?.rating || 0}
-                  showCount
-                  reviewCount={product?.reviewCount || 0}
-                  size="lg"
+                <StarRating
+                  rating={product.averageRating || 0}
+                  size="md"
                 />
               </div>
 
@@ -588,42 +570,11 @@ console.log(reviews)
                           {reviewStats.average}
                         </div>
                         <div className="flex items-center justify-center gap-1 mt-2">
-                          {getRatingStars(Math.round(reviewStats.average))}
+                          {<StarRating rating={reviewStats.average} size="md" />}
                         </div>
                         <div className="text-sm text-(--text-secondary) mt-1">
                           Based on {reviewStats.total} reviews
                         </div>
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        {[5, 4, 3, 2, 1].map((rating) => {
-                          const count = reviewStats.distribution[rating] || 0;
-                          const percentage =
-                            reviewStats.total > 0
-                              ? (count / reviewStats.total) * 100
-                              : 0;
-                          return (
-                            <div key={rating} className="flex items-center gap-2">
-                              <div className="flex items-center gap-1 w-16">
-                                <span className="text-sm font-medium">
-                                  {rating}
-                                </span>
-                                <Star
-                                  size={12}
-                                  className="fill-yellow-400 text-yellow-400"
-                                />
-                              </div>
-                              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-yellow-400 rounded-full"
-                                  style={{ width: `${percentage}%` }}
-                                />
-                              </div>
-                              <span className="text-sm text-(--text-secondary) w-12 text-right">
-                                {count}
-                              </span>
-                            </div>
-                          );
-                        })}
                       </div>
                     </div>
                   </div>
@@ -728,7 +679,7 @@ console.log(reviews)
                                   {review.user?.name || "Anonymous"}
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
-                                  {getRatingStars(review.rating)}
+                                  {<StarRating rating={review.rating} size="sm" />}
                                   <span className="text-xs text-(--text-secondary)">
                                     •
                                   </span>

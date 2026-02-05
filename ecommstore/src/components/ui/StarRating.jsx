@@ -150,14 +150,14 @@ export default function StarRating({
       <div 
         className="flex items-center" 
         role={interactive ? "radiogroup" : "img"} 
-        aria-label={`Rating: ${actualDisplay.toFixed(1)} out of ${maxStars}`}
+        aria-label={`Rating: ${actualDisplay} out of ${maxStars}`}
       >
         {Array.from({ length: maxStars }, (_, i) => renderStar(i))}
       </div>
       
       {showValue && (
         <span className="text-sm font-semibold text-yellow-400 ml-3 tabular-nums">
-          {actualDisplay.toFixed(1)}
+          {actualDisplay}
         </span>
       )}
     </div>

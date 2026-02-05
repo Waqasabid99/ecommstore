@@ -3,7 +3,11 @@ import { useState, useMemo, useEffect } from "react";
 import { SlidersHorizontal, X, ChevronDown, ChevronUp } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import ProductRating from "@/components/ui/ProductRating";
-import { baseUrl } from "@/lib/utils";
+import {
+  baseUrl,
+  renderCategories,
+  renderCategoryCheckboxes,
+} from "@/lib/utils";
 import ProductCardSkeleton from "@/components/product/ProductCardSkeleton";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 
@@ -53,15 +57,15 @@ const ShopPage = ({ products, categories }) => {
   }, [products]);
 
   // Get max price from products
-const maxPrice = useMemo(() => {
-  if (!products.length) return 50000;
+  const maxPrice = useMemo(() => {
+    if (!products.length) return 50000;
 
-  const prices = products.flatMap((p) =>
-    p.variants.map((v) => Number(v.price)),
-  );
+    const prices = products.flatMap((p) =>
+      p.variants.map((v) => Number(v.price)),
+    );
 
-  return Math.ceil(Math.max(...prices) / 1000) * 1000;
-}, [products]);
+    return Math.ceil(Math.max(...prices) / 1000) * 1000;
+  }, [products]);
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
@@ -230,6 +234,38 @@ const maxPrice = useMemo(() => {
     (selectedRating > 0 ? 1 : 0) +
     (showInStock ? 1 : 0);
 
+  const renderCategoryCheckboxes = (items, level = 0) =>
+    items.map((category) => (
+      <div key={category.id}>
+        <label
+          className="flex items-center justify-between cursor-pointer group"
+        >
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selectedCategories.includes(
+                category.slug?.toLowerCase(),
+              )}
+              onChange={() => toggleCategory(category.slug?.toLowerCase())}
+              className="w-4 h-4 rounded border-gray-300 text-(--color-brand-primary) focus:ring-2 focus:ring-(--color-brand-primary)"
+            />
+
+            <span className="text-sm text-(--text-primary) group-hover:text-(--color-brand-primary)">
+              {category.name}
+            </span>
+          </div>
+
+          <span className="text-xs text-(--text-secondary)">
+            ({category._count?.products || 0})
+          </span>
+        </label>
+
+        {/* Children */}
+        {category.children?.length > 0 &&
+          renderCategoryCheckboxes(category.children, level + 1)}
+      </div>
+    ));
+
   const Sidebar = ({ isMobile = false }) => (
     <div
       className={`${isMobile ? "fixed inset-0 z-50 lg:hidden" : "hidden lg:block"}`}
@@ -292,56 +328,7 @@ const maxPrice = useMemo(() => {
           </button>
           {expandedSections.categories && (
             <div className="p-4 pt-0 space-y-2">
-              {categories.map((category) => (
-                <label
-                  key={category.id}
-                  className="flex items-center justify-between cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(
-                        category.slug?.toLowerCase(),
-                      )}
-                      onChange={() =>
-                        toggleCategory(category.slug?.toLowerCase())
-                      }
-                      className="w-4 h-4 rounded border-gray-300 text-(--color-brand-primary) focus:ring-2 focus:ring-(--color-brand-primary)"
-                    />
-                    <span className="text-sm text-(--text-primary) group-hover:text-(--color-brand-primary)">
-                      {category.name}
-                    </span>
-                  </div>
-                  <span className="text-xs text-(--text-secondary)">
-                    ({category._count?.products || 0})
-                  </span>
-                </label>
-              ))}
-              {categories.children?.map((child) => (
-                <label
-                  key={child.id}
-                  className="flex items-center justify-between cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(
-                        child.slug?.toLowerCase(),
-                      )}
-                      onChange={() =>
-                        toggleCategory(child.slug?.toLowerCase())
-                      }
-                      className="w-4 h-4 rounded border-gray-300 text-(--color-brand-primary) focus:ring-2 focus:ring-(--color-brand-primary)"
-                    />
-                    <span className="text-sm text-(--text-primary) group-hover:text-(--color-brand-primary)">
-                      {child.name}
-                    </span>
-                  </div>
-                  <span className="text-xs text-(--text-secondary)">
-                    {/* ({category._count?.products || 0}) */}
-                  </span>
-                </label>
-              ))}
+              {renderCategoryCheckboxes(categories)}
             </div>
           )}
         </div>

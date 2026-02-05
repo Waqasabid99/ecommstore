@@ -6,6 +6,7 @@ import useCartStore from "@/store/useCartStore";
 import Loader from "../ui/Loader";
 import { useState } from "react";
 import Image from "next/image";
+import StarRating from "../ui/StarRating";
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCartStore();
@@ -33,7 +34,7 @@ const ProductCard = ({ product }) => {
       setIsLoading(false);
     }
   };
-
+  console.log(product)
   // Get thumbnail from new data structure
   const mainImage =
     product.thumbnail || product.images?.[0] || "/placeholder.png";
@@ -104,7 +105,7 @@ const ProductCard = ({ product }) => {
           </h3>
 
           {/* Rating (temporary static or optional) */}
-          <RatingStars rating={4} />
+          <StarRating rating={product.averageRating || 0} size="sm" />
 
           <h4 className="text-sm font-medium hover:text-(--text-hover)">
             Rs. {Number(displayPrice).toLocaleString()}

@@ -4,10 +4,12 @@ import { PiCreditCard } from "react-icons/pi";
 import { BsShop } from "react-icons/bs";
 import { CiDiscount1 } from "react-icons/ci";
 import { PiGlobeThin } from "react-icons/pi";
+import React from "react";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
+
 // Utility functions
 export const formatPrice = (price) => {
   return new Intl.NumberFormat('en-US', {
@@ -15,6 +17,7 @@ export const formatPrice = (price) => {
     currency: 'USD',
   }).format(price);
 };
+
 // format date and time
 export const formatDate = (date) => {
   return new Date(date).toLocaleDateString('en-US', {
@@ -87,3 +90,15 @@ export const stats = [
     { value: '14m', label: 'Products Sold' },
     { value: '82+', label: 'Global Stores' }
 ];
+
+export const renderCategories = (items, level = 0) =>
+  items.map((item) => (
+    <React.Fragment key={item.id}>
+      <option value={item.slug}>
+        {"".repeat(level)}{item.name}
+      </option>
+
+      {item.children?.length > 0 &&
+        renderCategories(item.children, level + 1)}
+    </React.Fragment>
+  ));

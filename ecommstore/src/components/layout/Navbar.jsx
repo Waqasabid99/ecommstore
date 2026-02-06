@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Search,
   ShoppingCart,
@@ -21,6 +22,8 @@ import useAuth from "@/hooks/useAuth";
 import useAuthStore from "@/store/authStore";
 import { getCategories } from "@/lib/api/category";
 import useCartStore from "@/store/useCartStore";
+import Fuse from "fuse.js";
+import { getProducts } from "@/lib/api/product";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -31,23 +34,114 @@ const Navbar = () => {
   const { logout, checkAuth } = useAuthStore();
   const { isAuthenticated, user } = useAuth();
 
+  // Search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [products, setProducts] = useState([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const searchRef = useRef(null);
+
   const { getCartItems, getCartSummary } = useCartStore();
   const cart = useCartStore((state) => state.cart);
   const { itemCount, subtotal } = getCartSummary();
 
   const cartItems = getCartItems();
-  const navigate = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
+
+  // Initialize Fuse instance
+  const fuse = useMemo(() => {
+    if (!products.length) return null;
+    
+    const options = {
+      keys: [
+        { name: 'name', weight: 0.7 },
+        { name: 'description', weight: 0.3 },
+        { name: 'category.name', weight: 0.5 },
+        { name: 'tag', weight: 0.4 },
+        { name: 'brand', weight: 0.3 }
+      ],
+      threshold: 0.4,
+      includeScore: true,
+      minMatchCharLength: 2
+    };
+    
+    return new Fuse(products, options);
+  }, [products]);
+
+  // Fetch products on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const data = await getProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  // Perform search
+  useEffect(() => {
+    if (!fuse || !searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    let results;
+    
+    if (selectedCategory) {
+      // Filter products by category first, then search
+      const categoryProducts = products.filter(
+        product => product.category?.id === selectedCategory || 
+                  product.category?.slug === selectedCategory
+      );
+      
+      const categoryFuse = new Fuse(categoryProducts, {
+        keys: [
+          { name: 'name', weight: 0.7 },
+          { name: 'description', weight: 0.3 },
+          { name: 'tag', weight: 0.4 },
+          { name: 'brand', weight: 0.3 }
+        ],
+        threshold: 0.4,
+        includeScore: true,
+        minMatchCharLength: 2
+      });
+      
+      results = categoryFuse.search(searchQuery).slice(0, 8);
+    } else {
+      // Search all products
+      results = fuse.search(searchQuery).slice(0, 8);
+    }
+    
+    setSearchResults(results);
+  }, [searchQuery, selectedCategory, fuse, products]);
+
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    if (!isSearchFocused || !searchRef.current) return;
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     checkAuth();
   }, []);
 
   useEffect(() => {
-    const fetechCategories = async () => {
+    const fetchCategories = async () => {
       const data = await getCategories();
       setCategories(data);
     };
-    fetechCategories();
+    fetchCategories();
   }, []);
 
   const promoMessages = [
@@ -73,16 +167,33 @@ const Navbar = () => {
   const handleLogout = async () => {
     await logout();
     setOpenProfileDropDown(false);
-    navigate.push("/");
+    router.push("/");
   };
-  console.log(categories);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      const queryParams = new URLSearchParams();
+      queryParams.set("q", searchQuery);
+      if (selectedCategory) queryParams.set("category", selectedCategory);
+      
+      router.push(`/shop?${queryParams.toString()}`);
+      setIsSearchFocused(false);
+    }
+  };
+
+  const handleResultClick = () => {
+    // Clear search and close dropdown after navigation
+    setSearchQuery("");
+    setIsSearchFocused(false);
+  };
+
   return (
     <nav className="w-full bg-white border-b border-(--border-default) mb-5 sticky top-0 left-0 z-50">
       {/* Top Bar */}
       <div className="bg-(--color-brand-primary) text-white">
         <div className="max-w-360 mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-10 text-xs sm:text-sm">
-            {/* Welcome Message */}
             <div className="hidden lg:flex items-center gap-2">
               <span>👋</span>
               <span className="font-medium">
@@ -90,7 +201,6 @@ const Navbar = () => {
               </span>
             </div>
 
-            {/* Promo Carousel - Center */}
             <div className="flex-1 lg:flex-initial flex items-center justify-center gap-2 sm:gap-4">
               <button
                 onClick={prevSlide}
@@ -113,7 +223,6 @@ const Navbar = () => {
               </button>
             </div>
 
-            {/* Contact Info */}
             <div className="hidden lg:flex items-center gap-4">
               <Link
                 href="tel:000-123-456789"
@@ -155,26 +264,96 @@ const Navbar = () => {
             </div>
 
             {/* Search Bar - Desktop & Tablet */}
-            <div className="hidden md:flex flex-1 max-w-2xl mx-4 lg:mx-8">
-              <div className="relative w-full">
-                <select className="absolute left-0 top-0 h-full px-4 pr-8 bg-black text-white rounded-l-full text-sm font-medium border-none outline-none appearance-none cursor-pointer">
+            <div 
+              className="hidden md:flex flex-1 max-w-2xl mx-4 lg:mx-8 relative"
+              ref={searchRef}
+            >
+              <form onSubmit={handleSearchSubmit} className="relative w-full">
+                <select 
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="absolute left-0 top-0 h-full px-4 pr-8 bg-black text-white rounded-l-full text-sm font-medium border-none outline-none appearance-none cursor-pointer hover:bg-gray-900 transition-colors z-10"
+                >
                   <option value="">All Categories</option>
                   {renderCategories(categories)}
                 </select>
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
                   className="w-full pl-44 pr-12 py-3 rounded-full bg-(--bg-surface) border border-(--border-default) focus:outline-none focus:border-(--border-primary) transition-colors text-sm"
                 />
-                <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-(--color-brand-primary) text-white p-2 rounded-full hover:opacity-90 transition-opacity">
+                <button 
+                  type="submit"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-(--color-brand-primary) text-white p-2 rounded-full hover:opacity-90 transition-opacity"
+                >
                   <Search size={18} />
                 </button>
-              </div>
+              </form>
+
+              {/* Search Results Dropdown */}
+              {isSearchFocused && (searchQuery.trim() || searchResults.length > 0) && (
+                <div className="absolute top-1/2 left-0 right-0 mt-6 bg-white rounded-lg shadow-2xl border border-(--border-default) z-50 overflow-hidden max-h-96 overflow-y-auto">
+                  {searchResults.length > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-(--border-default)">
+                        <span className="text-xs text-(--text-secondary)">
+                          {selectedCategory ? "Results from selected category" : "Results from all categories"}
+                        </span>
+                        <X size={16} onClick={handleResultClick} />
+                      </div>
+                      {searchResults.map(({ item, score }) => (
+                        <Link
+                          key={item.id}
+                          href={`/shop/products/${item.slug}`}
+                         onClick={handleResultClick}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b border-(--border-default) last:border-0 transition-colors no-underline text-current"
+                        >
+                          {item.thumbnail && (
+                            <img 
+                              src={item.thumbnail} 
+                              alt={item.name}
+                              className="w-12 h-12 object-cover rounded-md"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm text-(--text-primary) truncate">
+                              {item.name}
+                            </h4>
+                            <p className="text-xs text-(--text-secondary)">
+                              {item.category?.name || "Uncategorized"}
+                            </p>
+                            {item.variants && item.variants[0]?.price && (
+                              <p className="text-sm font-semibold text-(--color-brand-primary)">
+                                Rs. {item.variants[0].price}
+                              </p>
+                            )}
+                          </div>
+                          <Search size={16} className="text-(--text-secondary) opacity-50" />
+                        </Link>
+                      ))}
+                      <button 
+                        onClick={handleSearchSubmit}
+                        className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 text-center text-sm font-medium text-(--color-brand-primary) transition-colors border-t border-(--border-default)"
+                      >
+                        View all results for "{searchQuery}"
+                      </button>
+                    </>
+                  ) : searchQuery.trim() && searchQuery.length >= 2 ? (
+                    <div className="px-4 py-8 text-center text-(--text-secondary)">
+                      <Search size={32} className="mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No products found</p>
+                      <p className="text-xs mt-1">Try adjusting your search or category filter</p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Wishlist */}
               <button
                 className="hidden sm:flex p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
                 aria-label="Wishlist"
@@ -182,7 +361,6 @@ const Navbar = () => {
                 <Heart size={24} />
               </button>
 
-              {/* Cart */}
               <div className="relative">
                 <button
                   onClick={() => {
@@ -203,7 +381,6 @@ const Navbar = () => {
                   </div>
                 </button>
 
-                {/* Cart Dropdown */}
                 {isCartOpen && (
                   <>
                     <div
@@ -264,7 +441,6 @@ const Navbar = () => {
                 )}
               </div>
 
-              {/* User Profile */}
               {isAuthenticated ? (
                 <div className="relative">
                   <button
@@ -274,7 +450,6 @@ const Navbar = () => {
                     {user?.userName.charAt(0).toUpperCase()}
                   </button>
 
-                  {/* Profile Dropdown */}
                   {openProfileDropDown && (
                     <>
                       <div
@@ -330,17 +505,40 @@ const Navbar = () => {
           </div>
 
           {/* Search Bar - Mobile */}
-          <div className="md:hidden pb-4">
-            <div className="relative">
+          <div className="md:hidden pb-4" ref={searchRef}>
+            <form onSubmit={handleSearchSubmit} className="relative">
               <input
                 type="text"
                 placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
                 className="w-full pl-4 pr-12 py-2.5 rounded-full bg-(--bg-surface) border border-(--border-default) focus:outline-none focus:border-(--border-primary) transition-colors text-sm"
               />
-              <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-(--color-brand-primary) text-white p-2 rounded-full">
+              <button 
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-(--color-brand-primary) text-white p-2 rounded-full"
+              >
                 <Search size={16} />
               </button>
-            </div>
+            </form>
+            
+            {/* Mobile Search Results */}
+            {isSearchFocused && searchResults.length > 0 && (
+              <div className="absolute left-4 right-4 mt-2 bg-white rounded-lg shadow-2xl border border-(--border-default) z-50 max-h-64 overflow-y-auto">
+                {searchResults.map(({ item }) => (
+                  <Link
+                    key={item.id}
+                    href={`/shop/products/${item.slug}`}
+                    onClick={handleResultClick}
+                    className="block px-4 py-3 hover:bg-gray-50 border-b border-(--border-default) last:border-0 no-underline text-current"
+                  >
+                    <h4 className="font-medium text-sm text-(--text-primary)">{item.name}</h4>
+                    <p className="text-xs text-(--text-secondary)">{item.category?.name}</p>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

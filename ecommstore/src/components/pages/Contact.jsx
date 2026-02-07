@@ -1,6 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { Mail, Phone, MapPin, Clock, Send, MessageSquare, Headphones, Instagram, Facebook, Twitter, Linkedin } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock, Send, MessageSquare, Headphones, Instagram, Facebook, Twitter, Linkedin, X, XCircle } from 'lucide-react';
+import axios from 'axios';
+import { baseUrl } from '@/lib/utils';
+import PhoneInput from 'react-phone-input-2';
+import "react-phone-input-2/lib/style.css";
 
 const contactInfo = [
   {
@@ -58,6 +62,10 @@ const socialLinks = [
 ];
 
 const Contact = () => {
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -74,17 +82,32 @@ const Contact = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
-    alert('Thank you for contacting us! We will get back to you soon.');
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      subject: '',
-      message: ''
-    });
+    setLoading(true);
+    try {
+      const {data} = await axios.post(`${baseUrl}/contact`, formData, {withCredentials: true});
+      if (data.success) {
+        setFormSubmitted(true);
+        setLoading(false);
+        setSuccess('Thank you for contacting us! We will get back to you soon.');
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          subject: '',
+          message: ''
+        });
+      }
+      console.log('Form submitted:', formData);
+    } catch (error) {
+      setLoading(false);
+      setFormSubmitted(true);
+      setError('An error occurred while submitting the form.');
+      console.error('Error submitting form:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -154,7 +177,13 @@ const Contact = () => {
                 </p>
               </div>
 
-              <div className="space-y-6">
+              <form className="space-y-6">
+                {formSubmitted && (
+                <div className={`flex w-full justify-between items-center ${success ? 'bg-green-50 border border-green-500 rounded-lg p-4 text-green-500' : error ? 'bg-red-50 border border-red-500 rounded-lg p-4 text-red-500' : ''}`}>
+                {success ? <p>{success}</p> : error ? <p>{error}</p> : null}
+                <XCircle className='cursor-pointer' onClick={() => setFormSubmitted(false)} size={20} />
+                </div>
+                )}
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Name */}
                   <div>
@@ -167,7 +196,7 @@ const Contact = () => {
                       value={formData.name}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                      className="w-full px-2 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors"
                       placeholder="John Doe"
                     />
                   </div>
@@ -183,7 +212,7 @@ const Contact = () => {
                       value={formData.email}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                      className="w-full px-2 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors"
                       placeholder="john@example.com"
                     />
                   </div>
@@ -195,12 +224,19 @@ const Contact = () => {
                     <label className="block text-sm font-medium text-(--text-heading) mb-2">
                       Phone Number
                     </label>
-                    <input
-                      type="tel"
+                    <PhoneInput
+                      containerStyle={{ width: "100%" }}
+                      inputStyle={{ width: "100%", padding: "" }}
+                      country={"us"}
                       name="phone"
+                      enableSearch
+                      international
                       value={formData.phone}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                      onChange={(phone) =>
+                                  handleChange({
+                                    target: { name: "phone", value: phone },
+                                  })
+                                }
                       placeholder="+92 300 1234567"
                     />
                   </div>
@@ -216,7 +252,7 @@ const Contact = () => {
                       value={formData.subject}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                      className="w-full px-2 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors"
                       placeholder="How can we help?"
                     />
                   </div>
@@ -244,9 +280,9 @@ const Contact = () => {
                   className="w-full md:w-auto bg-(--btn-bg-primary) text-(--btn-text-primary) px-8 py-3 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium flex items-center justify-center gap-2"
                 >
                   <Send size={18} />
-                  Send Message
+                  {loading ? 'Sending...' : 'Send Message'}
                 </button>
-              </div>
+              </form>
             </div>
 
             {/* Sidebar */}

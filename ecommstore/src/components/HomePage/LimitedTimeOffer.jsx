@@ -1,123 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Clock, Heart, Tag } from 'lucide-react';
-
-// Sample offer products data
-const offerProducts = [
-  {
-    id: 1,
-    name: "Wireless Headphones Pro",
-    category: "audio",
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
-    originalPrice: 15999,
-    discountPrice: 9999,
-    discount: 38,
-    tag: "HOT DEAL",
-    rating: 4.5
-  },
-  {
-    id: 2,
-    name: "Smart Watch Ultra",
-    category: "wearables",
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-    originalPrice: 25999,
-    discountPrice: 17999,
-    discount: 31,
-    tag: "LIMITED",
-    rating: 4.8
-  },
-  {
-    id: 3,
-    name: "Bluetooth Speaker X",
-    category: "audio",
-    image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop",
-    originalPrice: 8999,
-    discountPrice: 5499,
-    discount: 39,
-    tag: "SALE",
-    rating: 4.3
-  },
-  {
-    id: 4,
-    name: "Laptop Stand Premium",
-    category: "accessories",
-    image: "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop",
-    originalPrice: 4999,
-    discountPrice: 2999,
-    discount: 40,
-    tag: "BEST PRICE",
-    rating: 4.6
-  }
-];
-
-const OfferProductCard = ({ product }) => {
-  return (
-    <div className="group relative border border-(--border-default) overflow-hidden flex flex-col bg-white">
-      
-      {/* Discount Badge */}
-      <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full z-10">
-        {product.discount}% OFF
-      </div>
-
-      {/* Top */}
-      <div className="flex justify-between items-center px-4 pt-4">
-        <span className="text-[10px] capitalize">{product.category}</span>
-        <button className="border border-(--border-default) rounded-full p-2
-                           hover:bg-(--btn-bg-hover) hover:text-(--btn-text-hover)">
-          <Heart size={16} />
-        </button>
-      </div>
-
-      {/* Image */}
-      <div className="relative flex justify-center items-center p-3">
-        <img
-          src={product.image}
-          alt={product.name}
-          className="h-40 object-cover transition-transform duration-300 group-hover:scale-110"
-        />
-
-        {/* Hover Add to Cart (Desktop) */}
-        <button
-          className="absolute opacity-0 group-hover:opacity-100
-                     transition-all bg-(--btn-bg-primary)
-                     text-(--btn-text-primary)
-                     rounded-full px-4 py-1"
-        >
-          Add to Cart
-        </button>
-      </div>
-
-      {/* Bottom */}
-      <div className="border-t border-(--border-default) px-4 py-5 flex flex-col gap-2">
-        <span className="text-[10px] text-(--text-inverse) bg-(--bg-primary) border border-(--border-default) rounded-full px-3 py-1 w-fit">
-          {product.tag}
-        </span>
-
-        <h3 className="font-semibold text-(--text-heading)">
-          {product.name}
-        </h3>
-
-        <div className="flex items-center gap-2">
-          <h4 className="text-lg font-bold text-red-500">
-            Rs. {product.discountPrice.toLocaleString()}
-          </h4>
-          <span className="text-sm text-(--text-secondary) line-through">
-            Rs. {product.originalPrice.toLocaleString()}
-          </span>
-        </div>
-
-        {/* Mobile Add to Cart */}
-        <button
-          className="mt-2 block lg:hidden bg-(--btn-bg-primary)
-                     text-(--btn-text-primary)
-                     rounded-full px-4 py-1"
-        >
-          Add to Cart
-        </button>
-      </div>
-    </div>
-  );
-};
+import { Clock, Tag } from 'lucide-react';
+import ProductCard from '../product/ProductCard';
 
 const CountdownTimer = ({ endDate }) => {
   const [timeLeft, setTimeLeft] = useState({
@@ -172,10 +56,45 @@ const CountdownTimer = ({ endDate }) => {
   );
 };
 
-const LimitedTimeOffer = () => {
+const LimitedTimeOffer = ({ products = [] }) => {
+  const [offerProducts, setOfferProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   // Set offer end date (3 days from now as example)
   const offerEndDate = new Date();
   offerEndDate.setDate(offerEndDate.getDate() + 3);
+
+  // Filter products based on tags
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setIsLoading(true);
+      
+      // Define offer-related keywords (case-insensitive)
+      const offerKeywords = ['sale', 'discount', 'off', 'deal', 'offer', 'flash', 'limited', 'hot'];
+      
+      const filteredProducts = products.filter(product => {
+        // Check if product has tags array
+        if (!product.tag || !Array.isArray(product.tag)) {
+          return false;
+        }
+        
+        // Check if any tag contains offer-related keywords
+        return product.tag.some(tag => {
+          const lowerTag = tag.toLowerCase();
+          return offerKeywords.some(keyword => lowerTag.includes(keyword));
+        });
+      });
+      
+      // Limit to first 4 products for display
+      setOfferProducts(filteredProducts.slice(0, 4));
+      setIsLoading(false);
+    }
+  }, [products]);
+
+  // Don't render the section if no offer products
+  if (offerProducts.length === 0) {
+    return null;
+  }
 
   return (
     <section className="mx-4 border border-(--border-default) rounded-xl pt-8 md:pt-12 mb-6 bg-linear-to-br from-red-50 to-orange-50">
@@ -213,9 +132,15 @@ const LimitedTimeOffer = () => {
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {offerProducts.map(product => (
-          <OfferProductCard key={product.id} product={product} />
-        ))}
+        {isLoading ? (
+          <div className="col-span-full flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--color-brand-primary)"></div>
+          </div>
+        ) : (
+          offerProducts.map(product => (
+            <ProductCard key={product.id} product={product} />
+          ))
+        )}
       </div>
 
       {/* View All Button */}

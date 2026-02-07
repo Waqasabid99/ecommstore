@@ -1,13 +1,13 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Products from "./Products";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Image from "next/image";
 
 const Catalog = ({ products, categories }) => {
   const [filteredProducts, setFilteredProducts] = useState(products);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [isEmpty, setIsEmpty] = useState(false);
-  console.log("Products:", products);
+  
   const categoryRef = useRef(null);
 
   const handleScroll = (direction) => {
@@ -22,23 +22,60 @@ const Catalog = ({ products, categories }) => {
   };
 
   const handleCategoryClick = (categoryId) => {
-    const find = products.filter((p) => categoryId === p.categoryId);
-    if (find.length > 0) {
-      return {
-        filteredProducts: setFilteredProducts(find),
-        isEmpty: setIsEmpty(false),
-      };
-    } else {
-      return {
-        filteredProducts: setFilteredProducts([]),
-        isEmpty: setIsEmpty(true),
-      };
+    // If clicking the same category, reset to show all products
+    if (selectedCategory === categoryId) {
+      setSelectedCategory(null);
+      setFilteredProducts(products);
+      setIsEmpty(products.length === 0);
+      return;
     }
+
+    // Filter products by category.id
+    const filtered = products.filter(
+      (product) => product.category?.id === categoryId
+    );
+
+    setSelectedCategory(categoryId);
+    setFilteredProducts(filtered);
+    setIsEmpty(filtered.length === 0);
   };
+
+  const renderCategoryButtons = (items, level = 0) => {
+  return items.map((category) => (
+    <React.Fragment key={category.id}>
+      <button
+        onClick={() => handleCategoryClick(category.id)}
+        className={`
+          whitespace-nowrap
+          border border-(--border-default)
+          rounded-full px-4 py-1.5
+          transition-all
+          ${selectedCategory === category.id
+            ? "bg-(--btn-bg-primary) text-(--btn-text-primary)"
+            : "bg-(--bg-primary) text-(--btn-text-primary) hover:bg-(--btn-bg-hover)"
+          }
+          ml-${level * 4}  /* optional: indent nested buttons */
+        `}
+      >
+        {category.name}
+      </button>
+
+      {/* recursively render children if they exist */}
+      {category.children?.length > 0 &&
+        renderCategoryButtons(category.children, level + 1)}
+    </React.Fragment>
+  ));
+};
+
+
+  // Reset when products change
   useEffect(() => {
-    if (products.length === 0) return setIsEmpty(true); 
-  }, [products]);
-  console.log("filteredProducts:", filteredProducts);
+    if (!selectedCategory) {
+      setFilteredProducts(products);
+      setIsEmpty(products.length === 0);
+    }
+  }, [products, selectedCategory]);
+
   return (
     <section className="mx-4 border border-(--border-default) rounded-xl pt-8 md:pt-12 mb-6">
       {/* Header */}
@@ -67,6 +104,7 @@ const Catalog = ({ products, categories }) => {
           <button
             onClick={() => handleScroll("left")}
             className="hidden md:flex"
+            aria-label="Scroll categories left"
           >
             <ChevronLeft
               size={24}
@@ -84,29 +122,37 @@ const Catalog = ({ products, categories }) => {
               pb-1
             "
           >
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => handleCategoryClick(category.id)}
-                className="
-                  whitespace-nowrap
-                  border border-(--border-default)
-                  bg-(--bg-primary)
-                  text-(--btn-text-primary)
-                  rounded-full px-4 py-1.5
-                  hover:bg-(--btn-bg-hover)
-                  transition-all
-                "
-              >
-                {category.name}
-              </button>
-            ))}
+            {/* All Products Button */}
+            <button
+              onClick={() => {
+                setSelectedCategory(null);
+                setFilteredProducts(products);
+                setIsEmpty(products.length === 0);
+              }}
+              className={`
+                whitespace-nowrap
+                border border-(--border-default)
+                rounded-full px-4 py-1.5
+                transition-all
+                ${
+                  selectedCategory === null
+                    ? "bg-(--btn-bg-primary) text-(--btn-text-primary)"
+                    : "bg-(--bg-primary) text-(--btn-text-primary) hover:bg-(--btn-bg-hover)"
+                }
+              `}
+            >
+              All
+            </button>
+
+            {/* Category Buttons */}
+            {renderCategoryButtons(categories)}
           </div>
 
           {/* Right Arrow */}
           <button
             onClick={() => handleScroll("right")}
             className="hidden md:flex"
+            aria-label="Scroll categories right"
           >
             <ChevronRight
               size={24}
@@ -115,16 +161,9 @@ const Catalog = ({ products, categories }) => {
           </button>
         </div>
       </div>
-      {isEmpty ? (
-        <div className="flex flex-col justify-center items-center min-h-fit py-5 font-semibold">
-          <Image loading="lazy" src="/empty.png" alt="empty" width={200} height={200} />
-          <h2 className="text-2xl font-semibold">
-            Oops! There are no products added yet. 
-          </h2>
-        </div>
-      ) : (
-        <Products products={filteredProducts} isEmpty={isEmpty} />
-      )}
+
+      {/* Products Grid */}
+      <Products products={filteredProducts} isEmpty={isEmpty} />
     </section>
   );
 };

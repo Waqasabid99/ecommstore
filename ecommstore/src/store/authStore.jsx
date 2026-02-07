@@ -17,7 +17,25 @@ const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const { data } = await api.post("/auth/register", formData);
-          set({ user: data.user, address: data.address, isLoading: false });
+          
+          // Set auth state first
+          set({ 
+            user: data.user, 
+            address: data.address, 
+            isAuthenticated: true,
+            isLoading: false 
+          });
+
+          // Get fresh cart store instance and merge with explicit user context
+          const cartStore = useCartStore.getState();
+          
+          // Small delay to ensure persist middleware writes to storage
+          // OR better: manually trigger the merge with user context
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          await cartStore.mergeGuestCart(data.user);
+          await cartStore.initializeCart();
+
           return { success: true };
         } catch (err) {
           set({
@@ -37,7 +55,8 @@ const useAuthStore = create(
           if (!data.success) {
             throw new Error(data.message || "Login failed");
           }
-          console.log(data);
+
+          // Set auth state first
           set({
             user: data.user,
             address: data.address,
@@ -45,8 +64,13 @@ const useAuthStore = create(
             isLoading: false,
           });
 
+          // Get fresh cart store instance
           const cartStore = useCartStore.getState();
-          await cartStore.mergeGuestCart();
+          
+          // Small delay to ensure persist middleware writes to storage
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          await cartStore.mergeGuestCart(data.user);
           await cartStore.initializeCart();
 
           return { success: true };
@@ -90,7 +114,6 @@ const useAuthStore = create(
           set({ user: data.user, isLoading: false, isAuthenticated: true });
           return true;
         } catch (err) {
-          // Only logout if refresh ALSO failed
           if (err.response?.status === 401) {
             set({ isLoading: false });
           }
@@ -105,6 +128,7 @@ const useAuthStore = create(
       partialize: (state) => ({
         user: state.user,
         address: state.address,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )

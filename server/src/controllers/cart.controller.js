@@ -543,7 +543,7 @@ const mergeCart = async (req, res) => {
           // 4️⃣ Get existing cart item (SAFE way)
           const existingItem = await tx.cartItem.findUnique({
             where: {
-              cartId_productVariantId: {
+              cartId_variantId: {
                 cartId: cart.id,
                 variantId,
               },
@@ -570,7 +570,7 @@ const mergeCart = async (req, res) => {
           // 5️⃣ Upsert cart item
           await tx.cartItem.upsert({
             where: {
-              cartId_productVariantId: {
+              cartId_variantId: {
                 cartId: cart.id,
                 variantId,
               },

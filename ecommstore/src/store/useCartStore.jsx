@@ -105,7 +105,6 @@ const useCartStore = create(
             summary: data.data.summary,
             issues: data.data.issues || [],
             isLoading: false,
-            guestCart: [], // Clear guest cart when authenticated
           });
         } catch (err) {
           console.error("Initialize cart error:", err);
@@ -415,49 +414,63 @@ const useCartStore = create(
       /**
        * Merge guest cart into authenticated cart after login
        */
-      mergeGuestCart: async () => {
-        const state = get();
-        const guestCart = state.guestCart;
+/**
+ * Merge guest cart into authenticated cart after login
+ * @param {Object} currentUser - Optional user object to avoid localStorage race condition
+ */
+mergeGuestCart: async (currentUser) => {
+  const state = get();
+  const guestCart = state.guestCart;
 
-        if (!guestCart || guestCart.length === 0) {
-          return { success: true, mergedCount: 0 };
-        }
+  if (!guestCart || guestCart.length === 0) {
+    return { success: true, mergedCount: 0 };
+  }
 
-        set({ isLoading: true, error: null });
-        try {
-          // Transform guest cart to API format
-          const items = guestCart
-            .map((item) => ({
-              productVariantId: item.variantId,
-              quantity: item.quantity,
-            }))
-            .filter((item) => item.productVariantId);
+  // Use passed user or fallback to reading from storage
+  const user = currentUser || (typeof window !== "undefined"
+    ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state?.user
+    : null);
 
-          if (items.length === 0) {
-            set({ guestCart: [], isLoading: false });
-            return { success: true, mergedCount: 0 };
-          }
+  if (!user) {
+    console.warn("mergeGuestCart called without user context");
+    return { success: false, error: "User not authenticated" };
+  }
 
-          const { data } = await api.post("/cart/merge", { items });
+  set({ isLoading: true, error: null });
+  try {
+    // Transform guest cart to API format
+    const items = guestCart
+      .map((item) => ({
+        variantId: item.variantId, // Changed from productVariantId to match your backend
+        quantity: item.quantity,
+      }))
+      .filter((item) => item.variantId);
 
-          // Clear guest cart and load authenticated cart
-          set({ guestCart: [], isLoading: false });
-          await get().initializeCart();
+    if (items.length === 0) {
+      set({ guestCart: [], isLoading: false });
+      return { success: true, mergedCount: 0 };
+    }
 
-          return {
-            success: true,
-            mergedCount: data.data.mergedCount,
-            skippedCount: data.data.skippedCount,
-            merged: data.data.merged,
-            skipped: data.data.skipped,
-          };
-        } catch (err) {
-          console.error("Merge cart error:", err);
-          const errorMsg = err.response?.data?.error || "Failed to merge cart";
-          set({ error: errorMsg, isLoading: false });
-          return { success: false, error: errorMsg };
-        }
-      },
+    const { data } = await api.post("/cart/merge", { items });
+
+    // Clear guest cart and load authenticated cart
+    set({ guestCart: [], isLoading: false });
+    await get().initializeCart();
+
+    return {
+      success: true,
+      mergedCount: data.data.mergedCount,
+      skippedCount: data.data.skippedCount,
+      merged: data.data.merged,
+      skipped: data.data.skipped,
+    };
+  } catch (err) {
+    console.error("Merge cart error:", err);
+    const errorMsg = err.response?.data?.error || "Failed to merge cart";
+    set({ error: errorMsg, isLoading: false });
+    return { success: false, error: errorMsg };
+  }
+},
 
       // =====================
       // UTILITY FUNCTIONS

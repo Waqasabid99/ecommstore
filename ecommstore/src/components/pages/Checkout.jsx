@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import {
   CreditCard,
   Truck,
@@ -609,23 +609,15 @@ const Checkout = () => {
                               size={18}
                               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)"
                             />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword((prev) => !prev)}
-                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary) hover:text-(--text-primary) transition-colors"
-                              aria-label={
-                                showPassword ? "Hide Password" : "Show Password"
-                              }
-                            >
                               {showPassword ? (
-                                <EyeOff size={18} />
+                                <EyeOff onClick={() => setShowPassword(false)} size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-(--text-secondary)"/>
                               ) : (
-                                <Eye size={18} />
+                                <Eye onClick={() => setShowPassword(true)} size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-(--text-secondary)"/>
                               )}
-                            </button>
                             <input
                               type={showPassword ? "text" : "password"}
                               name="password"
+                              aria-label="password"
                               value={shippingInfo.password}
                               onChange={handleShippingChange}
                               required

@@ -55,7 +55,6 @@ const registerUser = async (req, res) => {
 // Login user
 const loginUser = async (req, res) => {
     const { email, password } = req?.body;
-    console.log(email, password);
     try {
         const user = await prisma.user.findUnique({ where: { email, deletedAt: null } });
         if (!user) {
@@ -79,7 +78,6 @@ const loginUser = async (req, res) => {
                 userId: user.id,
             },
         })
-        console.log(userAddress);
         // Generate tokens
         const accessToken = generateToken(user);
         const rawRefreshToken = generateRefreshToken();

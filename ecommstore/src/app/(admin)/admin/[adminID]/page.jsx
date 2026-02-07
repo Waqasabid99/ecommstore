@@ -3,9 +3,10 @@ import { adminOrders } from "@/lib/api/adminOrders";
 import { getStats } from "@/lib/api/stat";
 
 const page = async () => {
+  setTimeout(() => {}, 100);
     const {data: orders, pagination} = await adminOrders();
     const {data: stat} = await getStats();
-    console.log(orders)
+    console.log(stat)
   return (
     <div>
         <Dashboard stats={stat} orders={orders} pagination={pagination}/>

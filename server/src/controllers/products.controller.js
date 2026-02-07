@@ -77,6 +77,7 @@ const getAllProducts = async (req, res) => {
                     id: v.id,
                     sku: v.sku,
                     price: v.price,
+                    attributes: v.attributes,
                     availableQty: v.inventory?.quantity ?? 0,
                     inStock: (v.inventory?.quantity ?? 0) > 0,
                     variantsCount: p.variants.length,
@@ -91,7 +92,6 @@ const getAllProducts = async (req, res) => {
                 // })),
             }
         });
-        console.log(transformed)
         res.status(200).json({
             success: true,
             data: transformed,
@@ -167,7 +167,6 @@ const getProductById = async (req, res) => {
                 user: r.user,
             })),
         };
-        console.log(transformed)
         res.status(200).json({
             success: true,
             data: transformed,

@@ -31,7 +31,7 @@ import Stats from "@/components/ui/Stats";
 import { baseUrl, formatDate } from "@/lib/utils";
 import axios from "axios";
 
-const Orders = () => {
+const Orders = ({ revenue }) => {
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
@@ -89,11 +89,6 @@ const Orders = () => {
           totalPages: data.pagination.totalPages,
         }));
 
-        // Calculate stats
-        const totalRevenue = data.data.reduce(
-          (sum, order) => sum + Number(order.totalAmount || 0),
-          0
-        );
         const pendingCount = data.data.filter((o) => o.status === "PENDING").length;
         const paidCount = data.data.filter((o) => o.status === "PAID").length;
         const deliveredCount = data.data.filter(
@@ -128,7 +123,7 @@ const Orders = () => {
   const handleUpdateOrder = (orderId) => {
     navigate.push(`/admin/${adminID}/orders/${orderId}/edit`);
   };
-  console.log(orders)
+
   const handleClearFilters = () => {
     setFilters({
       status: "",
@@ -264,7 +259,7 @@ const Orders = () => {
           },
           {
             label: "Total Revenue",
-            value: `$${stats.totalRevenue.toFixed(2)}`,
+            value: `$${revenue.total}`,
             icon: <DollarSign size={32} />,
           },
         ]}
@@ -446,7 +441,7 @@ const Orders = () => {
                 key: "totalAmount",
                 render: (_, order) => (
                   <span className="font-bold text-green-600">
-                    ${Number(order.totalAmount).toFixed(2)}
+                    ${Number(order.totalAmount)}
                   </span>
                 ),
               },

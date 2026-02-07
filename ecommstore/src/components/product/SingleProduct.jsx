@@ -17,8 +17,10 @@ import {
   ChevronDown,
   User,
   Calendar,
+  Package,
+  Tag,
+  Layers,
 } from "lucide-react";
-import ProductRating from "@/components/ui/ProductRating";
 import ProductCard from "@/components/product/ProductCard";
 import { usePathname } from "next/navigation";
 import useCartStore from "@/store/useCartStore";
@@ -31,6 +33,7 @@ import StarRating from "../ui/StarRating";
 
 // Product Page
 const SingleProductPage = ({ products }) => {
+  console.log(products);
   const slug = usePathname().split("/").pop();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -95,7 +98,8 @@ const SingleProductPage = ({ products }) => {
       setCanReview(false);
     }
   };
-console.log(reviews)
+  console.log(reviews);
+
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     setIsSubmittingReview(true);
@@ -165,6 +169,33 @@ console.log(reviews)
     thumbStart,
     thumbStart + THUMBNAILS_PER_VIEW
   );
+
+  // Helper function to format attribute key for display
+  const formatAttributeKey = (key) => {
+    return key
+      .split(/(?=[A-Z])|[_\s]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Helper function to render attributes
+  const renderAttributes = (attributes) => {
+    if (!attributes || Object.keys(attributes).length === 0) return null;
+    
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {Object.entries(attributes).map(([key, value]) => (
+          <span
+            key={key}
+            className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs text-gray-700"
+          >
+            <span className="font-medium">{formatAttributeKey(key)}:</span>
+            <span>{value}</span>
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   if (!product) {
     return (
@@ -271,19 +302,16 @@ console.log(reviews)
 
               {/* Rating */}
               <div className="flex items-center gap-4 pb-4 border-b border-(--border-default)">
-                <StarRating
-                  rating={product.averageRating || 0}
-                  size="md"
-                />
+                <StarRating rating={product.averageRating || 0} size="md" />
               </div>
 
               {/* Variant Selection */}
-              {product.variants && product.variants.length > 1 && (
+              {product.variants && product.variants.length > 0 && (
                 <div className="space-y-3 pb-4 border-b border-(--border-default)">
                   <label className="font-semibold text-(--text-heading) text-sm sm:text-base">
                     Select Variant:
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {product.variants.map((variant) => (
                       <button
                         key={variant.id}
@@ -297,23 +325,64 @@ console.log(reviews)
                             : "border-(--border-default) hover:border-gray-400"
                         }`}
                       >
-                        <div className="text-sm font-medium text-(--text-heading)">
-                          {variant.attributes
-                            ? Object.entries(variant.attributes)
-                                .map(([key, val]) => `${key}: ${val}`)
-                                .join(", ")
-                            : `Variant ${variant.sku}`}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-gray-500">
+                            SKU: {variant.sku}
+                          </span>
+                          {variant.inStock ? (
+                            <span className="text-xs text-green-600 font-medium">
+                              In Stock
+                            </span>
+                          ) : (
+                            <span className="text-xs text-red-500 font-medium">
+                              Out of Stock
+                            </span>
+                          )}
                         </div>
-                        <div className="text-sm font-bold text-(--color-brand-primary) mt-1">
-                          Rs. {variant.price}
-                        </div>
-                        <div className="text-xs text-(--text-secondary) mt-1">
-                          {variant.inStock
-                            ? `${variant.availableQty} in stock`
-                            : "Out of stock"}
+                        
+                        {/* Display Attributes */}
+                        {renderAttributes(variant.attributes)}
+                        
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                          <span className="text-sm font-bold text-(--color-brand-primary)">
+                            Rs. {variant.price}
+                          </span>
+                          <span className="text-xs text-(--text-secondary)">
+                            {variant.availableQty} available
+                          </span>
                         </div>
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Variant Details */}
+              {selectedVariant && selectedVariant.attributes && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <h4 className="text-sm font-semibold text-(--text-heading) mb-2 flex items-center gap-2">
+                    <Layers size={16} />
+                    Selected Variant Details
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(selectedVariant.attributes).map(([key, value]) => (
+                      <div key={key} className="flex justify-between text-sm">
+                        <span className="text-gray-600">{formatAttributeKey(key)}:</span>
+                        <span className="font-medium text-(--text-heading)">{value}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Price:</span>
+                      <span className="font-medium text-(--color-brand-primary)">
+                        Rs. {selectedVariant.price}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">SKU:</span>
+                      <span className="font-medium text-(--text-heading)">
+                        {selectedVariant.sku}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -528,7 +597,7 @@ console.log(reviews)
                       Available Variants
                     </span>
                     <span className="text-(--text-secondary)">
-                      {product?.variantsCount}
+                      {product?.variants?.length || 0}
                     </span>
                   </div>
                   {product?.tag && product.tag.length > 0 && (
@@ -540,6 +609,47 @@ console.log(reviews)
                         {product.tag.join(", ")}
                       </span>
                     </div>
+                  )}
+                  
+                  {/* Display all unique attributes from all variants */}
+                  {product?.variants && product.variants.length > 0 && (
+                    <>
+                      <div className="col-span-full mt-4 mb-2">
+                        <h4 className="font-semibold text-lg text-(--text-heading) flex items-center gap-2">
+                          <Package size={20} />
+                          Available Options
+                        </h4>
+                      </div>
+                      {(() => {
+                        // Collect all unique attribute keys across all variants
+                        const allAttributes = new Set();
+                        product.variants.forEach(variant => {
+                          if (variant.attributes) {
+                            Object.keys(variant.attributes).forEach(key => allAttributes.add(key));
+                          }
+                        });
+                        
+                        return Array.from(allAttributes).map(attrKey => {
+                          // Get all unique values for this attribute
+                          const values = [...new Set(
+                            product.variants
+                              .map(v => v.attributes?.[attrKey])
+                              .filter(Boolean)
+                          )];
+                          
+                          return (
+                            <div key={attrKey} className="flex justify-between items-center p-3 sm:p-4 bg-(--bg-surface) rounded-lg text-sm sm:text-base">
+                              <span className="font-medium text-(--text-heading)">
+                                {formatAttributeKey(attrKey)}
+                              </span>
+                              <span className="text-(--text-secondary)">
+                                {values.join(", ")}
+                              </span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </>
                   )}
                 </div>
               </div>
@@ -581,74 +691,74 @@ console.log(reviews)
                 )}
 
                 {/* Review Form */}
-{showReviewForm && (
-  <form
-    onSubmit={handleSubmitReview}
-    className="mb-8 p-6 bg-(--bg-surface) rounded-lg border-2 border-(--color-brand-primary)"
-  >
-    <h4 className="font-semibold text-lg mb-4">
-      Write Your Review
-    </h4>
-    <div className="space-y-4">
-      <div>
-        <RatingInput
-          value={reviewFormData.rating}
-          onChange={(rating) =>
-            setReviewFormData({
-              ...reviewFormData,
-              rating: rating,
-            })
-          }
-          label="Your Rating"
-          helperText="Click on stars to rate. Click left half for half stars."
-          size="lg"
-        />
-      </div>
-      
-      {/* Debug: Show current rating */}
-      <div className="text-xs text-gray-500">
-        Selected: {reviewFormData.rating} stars
-      </div>
+                {showReviewForm && (
+                  <form
+                    onSubmit={handleSubmitReview}
+                    className="mb-8 p-6 bg-(--bg-surface) rounded-lg border-2 border-(--color-brand-primary)"
+                  >
+                    <h4 className="font-semibold text-lg mb-4">
+                      Write Your Review
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <RatingInput
+                          value={reviewFormData.rating}
+                          onChange={(rating) =>
+                            setReviewFormData({
+                              ...reviewFormData,
+                              rating: rating,
+                            })
+                          }
+                          label="Your Rating"
+                          helperText="Click on stars to rate. Click left half for half stars."
+                          size="lg"
+                        />
+                      </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Comment (Optional)
-        </label>
-        <textarea
-          value={reviewFormData.comment}
-          onChange={(e) =>
-            setReviewFormData({
-              ...reviewFormData,
-              comment: e.target.value,
-            })
-          }
-          className="w-full px-4 py-2 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) resize-none"
-          rows={4}
-          placeholder="Share your experience with this product..."
-        />
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={isSubmittingReview || reviewFormData.rating === 0}
-          className="bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium disabled:opacity-50"
-        >
-          {isSubmittingReview ? "Submitting..." : "Submit Review"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setShowReviewForm(false);
-            setReviewFormData({ rating: 0, comment: "" }); // Reset to 0
-          }}
-          className="border-2 border-(--border-default) px-6 py-2 rounded-full hover:bg-(--bg-surface) transition-all font-medium"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </form>
-)}
+                      {/* Debug: Show current rating */}
+                      <div className="text-xs text-gray-500">
+                        Selected: {reviewFormData.rating} stars
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Comment (Optional)
+                        </label>
+                        <textarea
+                          value={reviewFormData.comment}
+                          onChange={(e) =>
+                            setReviewFormData({
+                              ...reviewFormData,
+                              comment: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) resize-none"
+                          rows={4}
+                          placeholder="Share your experience with this product..."
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={isSubmittingReview || reviewFormData.rating === 0}
+                          className="bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium disabled:opacity-50"
+                        >
+                          {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowReviewForm(false);
+                            setReviewFormData({ rating: 0, comment: "" }); // Reset to 0
+                          }}
+                          className="border-2 border-(--border-default) px-6 py-2 rounded-full hover:bg-(--bg-surface) transition-all font-medium"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
 
                 {/* Reviews List */}
                 {reviews.length === 0 ? (

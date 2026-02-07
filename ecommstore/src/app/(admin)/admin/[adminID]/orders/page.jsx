@@ -1,9 +1,11 @@
 import Orders from '@/components/admin/pages/Orders'
+import { getStats } from '@/lib/api/stat';
 
-const page = () => {
+const page = async () => {
+  const {data: stat} = await getStats();
   return (
     <div>
-      <Orders />
+      <Orders revenue={stat.revenue} />
     </div>
   )
 }

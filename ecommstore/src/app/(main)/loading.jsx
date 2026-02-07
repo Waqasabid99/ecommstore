@@ -1,8 +1,9 @@
 import Loader from '@/components/ui/Loader'
+import Loading from '../loading'
 
 const loading = () => {
   return (
-    <main className='flex items-center justify-center h-screen'><Loader size='md' text='' /></main>
+    <Loading />
   )
 }
 

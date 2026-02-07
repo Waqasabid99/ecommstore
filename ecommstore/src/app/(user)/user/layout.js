@@ -1,5 +1,4 @@
 import AdminNavbar from "@/components/layout/AdminNavbar";
-import Navbar from "@/components/layout/Navbar";
 import UserSidebar from "@/components/layout/UserSidebar";
 import FloatingCart from "@/components/ui/FloatingCart";
 import { Skeleton } from "@/components/ui/SidebarSkeleton";
@@ -13,7 +12,7 @@ export const metadata = {
     "Access your account. Enjoy a personalized shopping experience, track your orders, and manage your preferences with ease.",
 };
 
-export default function UserLayout({ children }) {
+export default async function UserLayout({ children }) {
   return (
     <div className="min-h-screen bg-(--bg-page)">
       <CheckAuth>

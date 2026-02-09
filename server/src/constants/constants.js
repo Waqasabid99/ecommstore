@@ -56,3 +56,15 @@ export const refreshCookieOptions = {
     sameSite: process.env.ENVIRONMENT === "production" ? "none" : "lax",
     maxAge: 30 * 24 * 60 * 60 * 1000,
 };
+
+/**
+ * Get promotion status based on dates and active flag
+ */
+export const getPromotionStatus = (promotion) => {
+    const now = new Date();
+
+    if (!promotion.isActive) return "INACTIVE";
+    if (now < promotion.startsAt) return "SCHEDULED";
+    if (now > promotion.endsAt) return "EXPIRED";
+    return "ACTIVE";
+}

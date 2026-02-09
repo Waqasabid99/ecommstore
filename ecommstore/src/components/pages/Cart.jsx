@@ -16,21 +16,23 @@ import Link from "next/link";
 import useCartStore from "@/store/useCartStore";
 import Loader from "../ui/Loader";
 import Image from "next/image";
+import axios from "axios";
+import { baseUrl } from "@/lib/utils";
 
 const Cart = () => {
+  const { getCartItems, getCartSummary, updateCartItem, removeCartItem, isLoading } = useCartStore();
+  const { totalQuantity, subtotal } = getCartSummary();
+  const cartItems = getCartItems();
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [loadingItem, setLoadingItem] = useState(null);
-  const {
-    getCartItems,
-    getCartSummary,
-    updateCartItem,
-    removeCartItem,
-    isLoading,
-  } = useCartStore();
-  const { totalQuantity, subtotal } = getCartSummary();
-  const cartItems = getCartItems();
-  console.log(cartItems)
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [discount, setDiscount] = useState(0);
+  const [discountPct, setDiscountPct] = useState(0);
+  const [shipping, setShipping] = useState(0);
+  const [tax, setTax] = useState(0);
+  const [total, setTotal] = useState(subtotal);
+
   const updateQuantity = async (itemId, currentQty, delta) => {
     const newQty = currentQty + delta;
     if (newQty < 1 || newQty > 99) return;
@@ -49,24 +51,36 @@ const Cart = () => {
     removeCartItem(itemId);
   };
 
-  // Calculate totals
-  const discount = appliedPromo ? subtotal * 0.1 : 0; // 10% discount example
-  const shipping = subtotal > 50000 ? 0 : 299; // Free shipping over Rs. 50,000
-  const tax = (subtotal - discount) * 0.17; // 17% tax
-  const total = subtotal - discount + shipping + tax;
-
-  const applyPromoCode = () => {
-    if (promoCode.trim().toUpperCase() === "SAVE10") {
-      setAppliedPromo("SAVE10");
-      alert("Promo code applied! 10% discount added.");
-    } else {
-      alert("Invalid promo code");
+  const applyPromoCode = async () => {
+    try {
+      setPromoLoading(true);
+      const {data} = await axios.post(`${baseUrl}/coupons/validate`, {
+        code: promoCode.toUpperCase().trim(),
+        cartTotal: subtotal
+      }, { withCredentials: true })
+      console.log(data)
+      if (data.success) {
+        setPromoLoading(false);
+        setAppliedPromo(promoCode);
+        setDiscount(data.data.discountAmount);
+        setDiscountPct(data.data.discountPct);
+        // setShippingCost(data.data.shippingCost);
+        setTotal(data.data.finalTotal);
+      }
+    } catch (error) {
+      console.log(error);
+      setAppliedPromo(null);
+    } finally {
+      setPromoLoading(false);
     }
   };
 
   const removePromoCode = () => {
     setAppliedPromo(null);
     setPromoCode("");
+    setDiscount(0);
+    // setShippingCost(0);
+    setTotal(subtotal);
   };
 
   if (cartItems?.length === 0) {
@@ -259,7 +273,7 @@ const Cart = () => {
                     {appliedPromo}
                   </p>
                   <p className="text-xs sm:text-sm text-(--color-brand-primary)">
-                    10% discount applied
+                    {discountPct}% discount applied ({discount})
                   </p>
                 </div>
               </div>
@@ -284,18 +298,10 @@ const Cart = () => {
                 onClick={applyPromoCode}
                 className="bg-(--btn-bg-primary) text-(--btn-text-primary) px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-(--btn-bg-hover) transition-all font-medium whitespace-nowrap text-sm sm:text-base"
               >
-                Apply
+                {promoLoading ? "Applying..." : "Apply"}
               </button>
             </div>
           )}
-
-          <p className="text-[10px] sm:text-xs text-(--text-secondary) mt-2 sm:mt-3">
-            Try code:{" "}
-            <span className="font-semibold text-(--color-brand-primary)">
-              SAVE10
-            </span>{" "}
-            for 10% off
-          </p>
         </div>
       </div>
 
@@ -314,9 +320,9 @@ const Cart = () => {
 
             {appliedPromo && (
               <div className="flex justify-between text-green-600 text-sm sm:text-base">
-                <span>Discount (10%)</span>
+                <span>Discount ({discountPct}%)</span>
                 <span className="font-medium">
-                  -Rs. {discount.toLocaleString()}
+                  -Rs. {discount}
                 </span>
               </div>
             )}
@@ -326,14 +332,14 @@ const Cart = () => {
               <span className="font-medium">
                 {shipping === 0
                   ? "Free"
-                  : `Rs. ${shipping.toLocaleString()}`}
+                  : `Rs. ${shipping}`}
               </span>
             </div>
 
             <div className="flex justify-between text-(--text-secondary) text-sm sm:text-base">
-              <span>Tax (17%)</span>
+              <span>Tax ({tax}%)</span>
               <span className="font-medium">
-                Rs. {Math.round(tax).toLocaleString()}
+                Rs. {Math.round(tax)}
               </span>
             </div>
 
@@ -343,7 +349,7 @@ const Cart = () => {
                   Total
                 </span>
                 <span className="font-bold text-(--text-heading) text-lg sm:text-xl">
-                  Rs. {Math.round(total).toLocaleString()}
+                  Rs. {total || 0}
                 </span>
               </div>
             </div>

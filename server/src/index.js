@@ -17,6 +17,7 @@ import dashboardRouter from "./routes/dashboard.routes.js";
 import reviewRouter from "./routes/review.route.js";
 import returnRouter from "./routes/return.routes.js";
 import contactRouter from "./routes/contactus.routes.js";
+import promotionRouter from "./routes/promotion.routes.js";
 const app = express();
 const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
 
@@ -45,6 +46,7 @@ app.use("/products", productRouter);
 app.use("/categories", categoryRouter);
 app.use("/cart", cartRouter);
 app.use("/coupons", couponRouter);
+app.use("/promotions", promotionRouter);
 app.use("/checkout", checkoutRouter);
 app.use("/orders", orderRouter);
 app.use("/reviews", reviewRouter);

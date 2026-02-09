@@ -1,6 +1,6 @@
 import { prisma } from "../config/prisma.js";
 import Decimal from "decimal.js";
-
+import { calculatePricingWithPromotions } from "../constants/pricing.js";
 
 // Get cart
 const getCart = async (req, res) => {
@@ -38,20 +38,28 @@ const getCart = async (req, res) => {
           },
           orderBy: { createdAt: "desc" },
         },
+        coupon: true, // Include coupon for price calculation
       },
     });
 
     // Auto-create cart
     if (!cart) {
       cart = await prisma.cart.create({
-        data: { userId },
-        include: { items: [] },
+        data: { 
+          userId,
+          subtotal: 0,
+          total: 0,
+        },
+        include: { 
+          items: [],
+          coupon: true,
+        },
       });
     }
 
-    let subtotal = new Decimal(0);
     const enrichedItems = [];
     const itemsWithIssues = [];
+    const validItems = []; // For price calculation
 
     for (const item of cart.items) {
       const variant = item.variant;
@@ -84,33 +92,32 @@ const getCart = async (req, res) => {
         itemsWithIssues.push({
           itemId: item.id,
           variantId: item.variantId,
-          name: item.name,
+          name: product?.name || item.name,
           availableStock,
           issues,
         });
+      } else {
+        // Only include valid items in pricing calculation
+        validItems.push(item);
       }
 
-      // Use SNAPSHOT price
-      const itemPrice = new Decimal(item.price);
-      const itemTotal = itemPrice.times(item.quantity);
-
-      if (issues.length === 0) {
-        subtotal = subtotal.plus(itemTotal);
-      }
+      // Use CURRENT price from variant (not snapshot)
+      const currentPrice = variant ? new Decimal(variant.price) : new Decimal(item.price);
+      const itemTotal = currentPrice.times(item.quantity);
 
       enrichedItems.push({
         id: item.id,
         variantId: item.variantId,
 
-        name: item.name,
-        description: item.description,
-        sku: item.sku,
+        name: product?.name || item.name,
+        description: product?.description,
+        sku: variant?.sku || item.sku,
         
         quantity: item.quantity,
-        price: itemPrice.toFixed(2),
+        price: currentPrice.toFixed(2), // Current price
         itemTotal: itemTotal.toFixed(2),
         thumbnail: product?.images?.find((i) => i.isMain)?.url ?? null,
-        images: product?.images?.map((i) => i.url) ?? null,
+        images: product?.images?.map((i) => i.url) ?? [],
         category: product?.category.name ?? null,
         product: {
           id: product?.id,
@@ -128,6 +135,26 @@ const getCart = async (req, res) => {
       });
     }
 
+    // Calculate actual pricing using the pricing function
+    const pricing = calculatePricingWithPromotions({
+      items: validItems,
+      coupon: cart.coupon,
+      taxRate: cart.taxRate ? parseFloat(cart.taxRate) : 0,
+      prisma
+    });
+
+    // Update cart with calculated values
+    await prisma.cart.update({
+      where: { id: cart.id },
+      data: {
+        subtotal: pricing.subtotal,
+        discountPct: pricing.discountPct,
+        discountAmount: pricing.discountAmount,
+        taxAmount: pricing.taxAmount,
+        total: pricing.total,
+      },
+    });
+
     return res.status(200).json({
       success: true,
       data: {
@@ -140,18 +167,27 @@ const getCart = async (req, res) => {
         items: enrichedItems,
         summary: {
           itemCount: cart.items.length,
-          validItemCount:
-            cart.items.length - itemsWithIssues.length,
-          totalQuantity: cart.items.reduce(
-            (sum, i) => sum + i.quantity,
-            0
-          ),
-          subtotal: subtotal.toFixed(2),
+          validItemCount: validItems.length,
+          totalQuantity: cart.items.reduce((sum, i) => sum + i.quantity, 0),
+          
+          // Pricing breakdown
+          subtotal: pricing.subtotal,
+          discountAmount: pricing.discountAmount,
+          discountPct: pricing.discountPct,
+          taxAmount: pricing.taxAmount,
+          taxRate: pricing.taxRate,
+          shippingAmount: pricing.shippingAmount,
+          total: pricing.total,
+          
+          // Coupon info
+          coupon: cart.coupon ? {
+            id: cart.coupon.id,
+            code: cart.coupon.code,
+            discountType: cart.coupon.discountType,
+            discountValue: cart.coupon.discountValue,
+          } : null,
         },
-        issues:
-          itemsWithIssues.length > 0
-            ? itemsWithIssues
-            : undefined,
+        issues: itemsWithIssues.length > 0 ? itemsWithIssues : undefined,
       },
     });
   } catch (error) {
@@ -186,19 +222,35 @@ const addToCart = async (req, res) => {
   }
 
   try {
-    const cartItem = await prisma.$transaction(async (tx) => {
-      // 1️⃣ Get or create active cart
+    const result = await prisma.$transaction(async (tx) => {
+      // Get or create active cart
       let cart = await tx.cart.findFirst({
         where: { userId, status: "ACTIVE" },
+        include: {
+          items: {
+            include: {
+              variant: true,
+            },
+          },
+          coupon: true,
+        },
       });
 
       if (!cart) {
         cart = await tx.cart.create({
-          data: { userId },
+          data: { 
+            userId,
+            subtotal: 0,
+            total: 0,
+          },
+          include: {
+            items: [],
+            coupon: true,
+          },
         });
       }
 
-      // 2️⃣ Fetch variant + inventory + product
+      // Fetch variant + inventory + product
       const variant = await tx.productVariant.findUnique({
         where: { id: variantId },
         include: {
@@ -219,7 +271,7 @@ const addToCart = async (req, res) => {
         (variant.inventory?.quantity ?? 0) -
         (variant.inventory?.reserved ?? 0);
 
-      // 3️⃣ Check existing cart item
+      // Check existing cart item
       const existing = await tx.cartItem.findUnique({
         where: {
           cartId_variantId: {
@@ -237,8 +289,8 @@ const addToCart = async (req, res) => {
         );
       }
 
-      // 4️⃣ Upsert cart item
-      return tx.cartItem.upsert({
+      // Upsert cart item with snapshot data
+      const cartItem = await tx.cartItem.upsert({
         where: {
           cartId_variantId: {
             cartId: cart.id,
@@ -247,7 +299,7 @@ const addToCart = async (req, res) => {
         },
         update: {
           quantity: { increment: quantity },
-          price: variant.price,
+          price: variant.price, // Snapshot current price
           name: variant.product.name,
           sku: variant.sku,
         },
@@ -255,17 +307,60 @@ const addToCart = async (req, res) => {
           cartId: cart.id,
           variantId,
           quantity,
-          price: variant.price,
+          price: variant.price, // Snapshot current price
           name: variant.product.name,
           sku: variant.sku,
         },
+        include: {
+          variant: true,
+        },
       });
+
+      // Recalculate cart pricing
+      const allItems = await tx.cartItem.findMany({
+        where: { cartId: cart.id },
+        include: {
+          variant: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      const pricing = calculatePricingWithPromotions({
+        items: allItems,
+        coupon: cart.coupon,
+        taxRate: cart.taxRate ? parseFloat(cart.taxRate) : 0,
+        prisma
+      });
+
+      // Update cart totals
+      await tx.cart.update({
+        where: { id: cart.id },
+        data: {
+          subtotal: pricing.subtotal,
+          discountPct: pricing.discountPct,
+          discountAmount: pricing.discountAmount,
+          taxAmount: pricing.taxAmount,
+          total: pricing.total,
+        },
+      });
+
+      return { cartItem, pricing };
     });
 
     return res.status(200).json({
       success: true,
       message: "Item added to cart",
-      data: cartItem,
+      data: {
+        item: result.cartItem,
+        summary: {
+          subtotal: result.pricing.subtotal,
+          total: result.pricing.total,
+          itemCount: result.pricing.itemCount,
+        },
+      },
     });
   } catch (error) {
     console.error("Add to cart error:", error);
@@ -293,7 +388,7 @@ const updateCartItem = async (req, res) => {
   }
 
   try {
-    const updatedItem = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const item = await tx.cartItem.findFirst({
         where: {
           id: itemId,
@@ -303,6 +398,11 @@ const updateCartItem = async (req, res) => {
           },
         },
         include: {
+          cart: {
+            include: {
+              coupon: true,
+            },
+          },
           variant: {
             include: {
               inventory: true,
@@ -319,37 +419,79 @@ const updateCartItem = async (req, res) => {
       const variant = item.variant;
       const product = variant.product;
 
-      if (
-        variant.deletedAt ||
-        product.deletedAt ||
-        !product.isActive
-      ) {
+      if (variant.deletedAt || product.deletedAt || !product.isActive) {
         throw new Error("Product is no longer available");
       }
 
-      const stock = variant.inventory?.quantity ?? 0;
+      const availableStock = (variant.inventory?.quantity ?? 0) - 
+                            (variant.inventory?.reserved ?? 0);
 
-      if (quantity > stock) {
-        throw new Error(`Insufficient stock. Available: ${stock}`);
+      if (quantity > availableStock) {
+        throw new Error(`Insufficient stock. Available: ${availableStock}`);
       }
 
-      return tx.cartItem.update({
+      // Update item with current price
+      const updatedItem = await tx.cartItem.update({
         where: { id: item.id },
         data: {
           quantity,
-          price: variant.price, // explicit resync
+          price: variant.price, // Update to current price
+          name: product.name,
+          sku: variant.sku,
+        },
+        include: {
+          variant: true,
         },
       });
+
+      // Recalculate cart pricing
+      const allItems = await tx.cartItem.findMany({
+        where: { cartId: item.cartId },
+        include: {
+          variant: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      const pricing = calculatePricingWithPromotions({
+        items: allItems,
+        coupon: item.cart.coupon,
+        taxRate: item.cart.taxRate ? parseFloat(item.cart.taxRate) : 0,
+        prisma
+      });
+
+      // Update cart totals
+      await tx.cart.update({
+        where: { id: item.cartId },
+        data: {
+          subtotal: pricing.subtotal,
+          discountPct: pricing.discountPct,
+          discountAmount: pricing.discountAmount,
+          taxAmount: pricing.taxAmount,
+          total: pricing.total,
+        },
+      });
+
+      return { updatedItem, pricing };
     });
 
     return res.status(200).json({
       success: true,
       message: "Cart item updated successfully",
-      data: updatedItem,
+      data: {
+        item: result.updatedItem,
+        summary: {
+          subtotal: result.pricing.subtotal,
+          total: result.pricing.total,
+          itemCount: result.pricing.itemCount,
+        },
+      },
     });
   } catch (error) {
     console.error("Update cart item error:", error);
-
     return res.status(400).json({
       success: false,
       error: error.message || "Failed to update cart item",
@@ -362,43 +504,88 @@ const updateCartItem = async (req, res) => {
  * DELETE /api/cart/items/:itemId
  */
 const removeCartItem = async (req, res) => {
-    const { id: itemId } = req.params;
-    const userId = req.user?.id;
+  const { id: itemId } = req.params;
+  const userId = req.user?.id;
 
-    try {
-        await prisma.$transaction(async (tx) => {
-            const item = await tx.cartItem.findUnique({
-                where: { id: itemId },
-                include: { cart: true },
-            });
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const item = await tx.cartItem.findUnique({
+        where: { id: itemId },
+        include: { 
+          cart: {
+            include: {
+              coupon: true,
+            },
+          },
+        },
+      });
 
-            if (!item) throw new Error("Cart item not found");
+      if (!item) throw new Error("Cart item not found");
 
-            if (item.cart.userId !== userId) {
-                throw new Error("Unauthorized cart access");
-            }
+      if (item.cart.userId !== userId) {
+        throw new Error("Unauthorized cart access");
+      }
 
-            if (item.cart.status !== "ACTIVE") {
-                throw new Error("Cannot modify a checked-out cart");
-            }
+      if (item.cart.status !== "ACTIVE") {
+        throw new Error("Cannot modify a checked-out cart");
+      }
 
-            await tx.cartItem.delete({
-                where: { id: itemId },
-            });
-        });
+      await tx.cartItem.delete({
+        where: { id: itemId },
+      });
 
-        return res.status(200).json({
-            success: true,
-            message: "Item removed from cart successfully",
-        });
-    } catch (error) {
-        console.error("Remove cart item error:", error);
+      // Recalculate cart pricing
+      const allItems = await tx.cartItem.findMany({
+        where: { cartId: item.cartId },
+        include: {
+          variant: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
 
-        return res.status(400).json({
-            success: false,
-            error: error.message || "Failed to remove cart item",
-        });
-    }
+      const pricing = calculatePricingWithPromotions({
+        items: allItems,
+        coupon: item.cart.coupon,
+        taxRate: item.cart.taxRate ? parseFloat(item.cart.taxRate) : 0,
+        prisma
+      });
+
+      // Update cart totals
+      await tx.cart.update({
+        where: { id: item.cartId },
+        data: {
+          subtotal: pricing.subtotal,
+          discountPct: pricing.discountPct,
+          discountAmount: pricing.discountAmount,
+          taxAmount: pricing.taxAmount,
+          total: pricing.total,
+        },
+      });
+
+      return pricing;
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Item removed from cart successfully",
+      data: {
+        summary: {
+          subtotal: result.subtotal,
+          total: result.total,
+          itemCount: result.itemCount,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Remove cart item error:", error);
+    return res.status(400).json({
+      success: false,
+      error: error.message || "Failed to remove cart item",
+    });
+  }
 };
 
 /**
@@ -406,51 +593,59 @@ const removeCartItem = async (req, res) => {
  * DELETE /api/cart
  */
 const clearCart = async (req, res) => {
-    const userId = req.user?.id;
+  const userId = req.user?.id;
 
-    try {
-        await prisma.$transaction(async (tx) => {
-            // Get cart
-            const cart = await tx.cart.findUnique({
-                where: { userId },
-            });
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Get cart
+      const cart = await tx.cart.findFirst({
+        where: { 
+          userId,
+          status: "ACTIVE",
+        },
+      });
 
-            if (!cart) {
-                throw new Error("Cart not found");
-            }
+      if (!cart) {
+        throw new Error("Cart not found");
+      }
 
-            if (cart.status !== "ACTIVE") {
-                throw new Error("Cannot modify a checked-out cart");
-            }
+      // Delete all items
+      await tx.cartItem.deleteMany({
+        where: { cartId: cart.id },
+      });
 
-            // Delete all items
-            await tx.cartItem.deleteMany({
-                where: { cartId: cart.id },
-            });
-        });
+      // Reset cart totals
+      await tx.cart.update({
+        where: { id: cart.id },
+        data: {
+          subtotal: 0,
+          discountPct: null,
+          discountAmount: null,
+          taxAmount: null,
+          total: 0,
+        },
+      });
+    });
 
-        return res.status(200).json({
-            success: true,
-            message: "Cart cleared successfully",
-        });
-    } catch (error) {
-        console.error("Clear cart error:", error);
+    return res.status(200).json({
+      success: true,
+      message: "Cart cleared successfully",
+    });
+  } catch (error) {
+    console.error("Clear cart error:", error);
 
-        if (
-            error.message === "Cart not found" ||
-            error.message === "Cannot modify a checked-out cart"
-        ) {
-            return res.status(400).json({
-                success: false,
-                error: error.message,
-            });
-        }
-
-        return res.status(500).json({
-            success: false,
-            error: "Internal Server Error",
-        });
+    if (error.message === "Cart not found") {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
     }
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal Server Error",
+    });
+  }
 };
 
 /**
@@ -473,11 +668,22 @@ const mergeCart = async (req, res) => {
       // 1️⃣ Get or create ACTIVE cart
       let cart = await tx.cart.findFirst({
         where: { userId, status: "ACTIVE" },
+        include: {
+          coupon: true,
+        },
       });
 
       if (!cart) {
         cart = await tx.cart.create({
-          data: { userId, status: "ACTIVE" },
+          data: { 
+            userId, 
+            status: "ACTIVE",
+            subtotal: 0,
+            total: 0,
+          },
+          include: {
+            coupon: true,
+          },
         });
       }
 
@@ -488,11 +694,7 @@ const mergeCart = async (req, res) => {
       for (const guestItem of items) {
         const { variantId, quantity } = guestItem;
 
-        if (
-          !variantId ||
-          !Number.isInteger(quantity) ||
-          quantity <= 0
-        ) {
+        if (!variantId || !Number.isInteger(quantity) || quantity <= 0) {
           skippedItems.push({
             variantId,
             reason: "Invalid item data",
@@ -529,7 +731,9 @@ const mergeCart = async (req, res) => {
             continue;
           }
 
-          const availableStock = variant.inventory?.quantity ?? 0;
+          const availableStock = 
+            (variant.inventory?.quantity ?? 0) - 
+            (variant.inventory?.reserved ?? 0);
 
           if (availableStock <= 0) {
             skippedItems.push({
@@ -540,7 +744,7 @@ const mergeCart = async (req, res) => {
             continue;
           }
 
-          // 4️⃣ Get existing cart item (SAFE way)
+          // 4️⃣ Get existing cart item
           const existingItem = await tx.cartItem.findUnique({
             where: {
               cartId_variantId: {
@@ -567,7 +771,7 @@ const mergeCart = async (req, res) => {
             continue;
           }
 
-          // 5️⃣ Upsert cart item
+          // 5️⃣ Upsert cart item with current prices
           await tx.cartItem.upsert({
             where: {
               cartId_variantId: {
@@ -577,7 +781,7 @@ const mergeCart = async (req, res) => {
             },
             update: {
               quantity: finalQuantity,
-              price: variant.price, // explicit resync
+              price: variant.price, // Use current price
               name: variant.product.name,
               sku: variant.sku,
             },
@@ -585,7 +789,7 @@ const mergeCart = async (req, res) => {
               cartId: cart.id,
               variantId,
               quantity: finalQuantity,
-              price: variant.price,
+              price: variant.price, // Use current price
               name: variant.product.name,
               sku: variant.sku,
             },
@@ -598,10 +802,7 @@ const mergeCart = async (req, res) => {
             adjusted: finalQuantity !== currentQuantity + quantity,
           });
         } catch (itemError) {
-          console.error(
-            `Error processing variant ${variantId}:`,
-            itemError
-          );
+          console.error(`Error processing variant ${variantId}:`, itemError);
           skippedItems.push({
             variantId,
             reason: "Error processing item",
@@ -609,7 +810,38 @@ const mergeCart = async (req, res) => {
         }
       }
 
-      return { mergedItems, skippedItems };
+      // 6️⃣ Recalculate cart pricing
+      const allItems = await tx.cartItem.findMany({
+        where: { cartId: cart.id },
+        include: {
+          variant: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      const pricing = calculatePricingWithPromotions({
+        items: allItems,
+        coupon: cart.coupon,
+        taxRate: cart.taxRate ? parseFloat(cart.taxRate) : 0,
+        prisma
+      });
+
+      // Update cart totals
+      await tx.cart.update({
+        where: { id: cart.id },
+        data: {
+          subtotal: pricing.subtotal,
+          discountPct: pricing.discountPct,
+          discountAmount: pricing.discountAmount,
+          taxAmount: pricing.taxAmount,
+          total: pricing.total,
+        },
+      });
+
+      return { mergedItems, skippedItems, pricing };
     });
 
     return res.status(200).json({
@@ -619,15 +851,16 @@ const mergeCart = async (req, res) => {
         mergedCount: result.mergedItems.length,
         skippedCount: result.skippedItems.length,
         merged: result.mergedItems,
-        skipped:
-          result.skippedItems.length > 0
-            ? result.skippedItems
-            : undefined,
+        skipped: result.skippedItems.length > 0 ? result.skippedItems : undefined,
+        summary: {
+          subtotal: result.pricing.subtotal,
+          total: result.pricing.total,
+          itemCount: result.pricing.itemCount,
+        },
       },
     });
   } catch (error) {
     console.error("Merge cart error:", error);
-
     return res.status(500).json({
       success: false,
       error: "Internal Server Error",
@@ -639,7 +872,6 @@ const mergeCart = async (req, res) => {
  * Get cart summary (lightweight endpoint)
  * GET /api/cart/summary
  */
-
 const getCartSummary = async (req, res) => {
   const userId = req.user.id;
 
@@ -651,11 +883,15 @@ const getCartSummary = async (req, res) => {
       },
       include: {
         items: {
-          select: {
-            quantity: true,
-            price: true,
+          include: {
+            variant: {
+              include: {
+                product: true,
+              },
+            },
           },
         },
+        coupon: true,
       },
     });
 
@@ -663,30 +899,44 @@ const getCartSummary = async (req, res) => {
       return res.status(200).json({
         success: true,
         data: {
-          itemCount: 0,        // distinct items
-          totalQuantity: 0,    // sum of quantities
+          itemCount: 0,
+          totalQuantity: 0,
           subtotal: "0.00",
+          total: "0.00",
           status: "ACTIVE",
         },
       });
     }
 
-    let subtotal = new Decimal(0);
-    let totalQuantity = 0;
+    // Calculate pricing with current variant prices
+    const pricing = calculatePricingWithPromotions({
+      items: cart.items,
+      coupon: cart.coupon,
+      taxRate: cart.taxRate ? parseFloat(cart.taxRate) : 0,
+      prisma
+    });
 
-    for (const item of cart.items) {
-      subtotal = subtotal.plus(
-        new Decimal(item.price).times(item.quantity)
-      );
-      totalQuantity += item.quantity;
-    }
+    // Update cart totals in background (don't wait)
+    prisma.cart.update({
+      where: { id: cart.id },
+      data: {
+        subtotal: pricing.subtotal,
+        discountPct: pricing.discountPct,
+        discountAmount: pricing.discountAmount,
+        taxAmount: pricing.taxAmount,
+        total: pricing.total,
+      },
+    }).catch(err => console.error("Background cart update error:", err));
 
     return res.status(200).json({
       success: true,
       data: {
-        itemCount: cart.items.length,
-        totalQuantity,
-        subtotal: subtotal.toFixed(2),
+        itemCount: pricing.itemCount,
+        totalQuantity: pricing.totalQuantity,
+        subtotal: pricing.subtotal,
+        discountAmount: pricing.discountAmount,
+        taxAmount: pricing.taxAmount,
+        total: pricing.total,
         status: cart.status,
       },
     });
@@ -700,11 +950,11 @@ const getCartSummary = async (req, res) => {
 };
 
 export {
-    getCart,
-    addToCart,
-    updateCartItem,
-    removeCartItem,
-    clearCart,
-    mergeCart,
-    getCartSummary,
+  getCart,
+  addToCart,
+  updateCartItem,
+  removeCartItem,
+  clearCart,
+  mergeCart,
+  getCartSummary,
 };

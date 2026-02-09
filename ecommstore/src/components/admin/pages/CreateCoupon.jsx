@@ -14,6 +14,7 @@ import {
   AlertCircle,
   CheckCircle,
   Sparkles,
+  DollarSign,
 } from "lucide-react";
 import DashboardHeadingBox from "@/components/ui/DashboardHeadingBox";
 import { baseUrl } from "@/lib/utils";
@@ -22,7 +23,8 @@ import axios from "axios";
 const AddCoupon = () => {
   const [formData, setFormData] = useState({
     code: "",
-    discountPct: "",
+    discountType: "PERCENT",
+    discountValue: "",
     expiresAt: "",
     usageLimit: "",
     isActive: true,
@@ -43,14 +45,15 @@ const AddCoupon = () => {
       newErrors.code = "Coupon code must be at least 3 characters";
     }
 
-    if (!formData.discountPct) {
-      newErrors.discountPct = "Discount percentage is required";
+    if (!formData.discountValue) {
+      newErrors.discountValue = "Discount value is required";
+    } else if (isNaN(formData.discountValue) || formData.discountValue <= 0) {
+      newErrors.discountValue = "Discount value must be greater than 0";
     } else if (
-      isNaN(formData.discountPct) ||
-      formData.discountPct < 1 ||
-      formData.discountPct > 100
+      formData.discountType === "PERCENT" &&
+      (formData.discountValue < 1 || formData.discountValue > 100)
     ) {
-      newErrors.discountPct = "Discount must be between 1 and 100";
+      newErrors.discountValue = "Discount percentage must be between 1 and 100";
     }
 
     if (!formData.expiresAt) {
@@ -114,7 +117,8 @@ const AddCoupon = () => {
     try {
       const payload = {
         code: formData.code.toUpperCase().trim(),
-        discountPct: Number(formData.discountPct),
+        discountType: formData.discountType,
+        discountValue: Number(formData.discountValue),
         expiresAt: formData.expiresAt,
         usageLimit: formData.usageLimit ? Number(formData.usageLimit) : undefined,
         isActive: formData.isActive,
@@ -153,7 +157,8 @@ const AddCoupon = () => {
   const handleReset = () => {
     setFormData({
       code: "",
-      discountPct: "",
+      discountType: "PERCENT",
+      discountValue: "",
       expiresAt: "",
       usageLimit: "",
       isActive: true,
@@ -268,42 +273,78 @@ const AddCoupon = () => {
                 </p>
               </div>
 
-              {/* Discount Percentage Field */}
+              {/* Discount Type Field */}
               <div>
                 <label
-                  htmlFor="discountPct"
+                  htmlFor="discountType"
                   className="flex items-center gap-2 text-gray-800 font-semibold mb-3"
                 >
                   <Percent size={18} className="text-black" />
-                  Discount Percentage
+                  Discount Type
+                  <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="discountType"
+                  name="discountType"
+                  value={formData.discountType}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black transition-colors text-gray-800 bg-white"
+                >
+                  <option value="PERCENT">Percentage (%)</option>
+                  <option value="FIXED">Fixed Amount ($)</option>
+                </select>
+                <p className="text-gray-500 text-xs mt-2">
+                  Choose whether the discount is a percentage off or a fixed dollar amount.
+                </p>
+              </div>
+
+              {/* Discount Value Field */}
+              <div>
+                <label
+                  htmlFor="discountValue"
+                  className="flex items-center gap-2 text-gray-800 font-semibold mb-3"
+                >
+                  {formData.discountType === "PERCENT" ? (
+                    <Percent size={18} className="text-black" />
+                  ) : (
+                    <DollarSign size={18} className="text-black" />
+                  )}
+                  Discount Value
                   <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="number"
-                    id="discountPct"
-                    name="discountPct"
-                    value={formData.discountPct}
+                    id="discountValue"
+                    name="discountValue"
+                    value={formData.discountValue}
                     onChange={handleInputChange}
-                    placeholder="e.g., 10, 25, 50"
-                    min="1"
-                    max="100"
+                    placeholder={
+                      formData.discountType === "PERCENT"
+                        ? "e.g., 10, 25, 50"
+                        : "e.g., 5, 10, 25"
+                    }
+                    min={formData.discountType === "PERCENT" ? "1" : "0.01"}
+                    max={formData.discountType === "PERCENT" ? "100" : undefined}
+                    step={formData.discountType === "PERCENT" ? "1" : "0.01"}
                     className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-black transition-colors text-gray-800 ${
-                      errors.discountPct ? "border-red-500" : "border-gray-300"
+                      errors.discountValue ? "border-red-500" : "border-gray-300"
                     }`}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
-                    %
+                    {formData.discountType === "PERCENT" ? "%" : "$"}
                   </span>
                 </div>
-                {errors.discountPct && (
+                {errors.discountValue && (
                   <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
                     <AlertCircle size={12} />
-                    {errors.discountPct}
+                    {errors.discountValue}
                   </p>
                 )}
                 <p className="text-gray-500 text-xs mt-2">
-                  Enter a percentage between 1 and 100.
+                  {formData.discountType === "PERCENT"
+                    ? "Enter a percentage between 1 and 100."
+                    : "Enter a fixed dollar amount greater than 0."}
                 </p>
               </div>
 
@@ -444,7 +485,7 @@ const AddCoupon = () => {
           </div>
 
           {/* Preview Section */}
-          {formData.code && formData.discountPct && (
+          {formData.code && formData.discountValue && (
             <div className="mt-6 bg-white border border-gray-200 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 Preview
@@ -458,7 +499,11 @@ const AddCoupon = () => {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-5xl font-bold">{formData.discountPct}%</p>
+                    <p className="text-5xl font-bold">
+                      {formData.discountType === "PERCENT"
+                        ? `${formData.discountValue}%`
+                        : `$${formData.discountValue}`}
+                    </p>
                     <p className="text-sm opacity-90 mt-1">OFF</p>
                   </div>
                 </div>

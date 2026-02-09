@@ -1,6 +1,10 @@
 import { prisma } from "../config/prisma.js";
+import { calculatePricing } from "../constants/pricing.js";
 
-// Get all coupons (Admin only)
+/**
+ * Get all coupons (Admin only)
+ * GET /api/admin/coupons
+ */
 const getAllCoupons = async (req, res) => {
     const { page = 1, limit = 20, isActive, search } = req.query;
     const skip = (page - 1) * limit;
@@ -26,7 +30,6 @@ const getAllCoupons = async (req, res) => {
             prisma.coupon.count({ where }),
         ]);
 
-        // Enhance with usage statistics
         const enrichedCoupons = coupons.map((coupon) => ({
             ...coupon,
             isExpired: new Date() > coupon.expiresAt,
@@ -57,7 +60,10 @@ const getAllCoupons = async (req, res) => {
     }
 };
 
-// Get coupon by ID (Admin only)
+/**
+ * Get coupon by ID (Admin only)
+ * GET /api/admin/coupons/:id
+ */
 const getCouponById = async (req, res) => {
     const { id } = req.params;
 
@@ -97,23 +103,46 @@ const getCouponById = async (req, res) => {
     }
 };
 
-// Create coupon (Admin only)
+/**
+ * Create coupon (Admin only)
+ * POST /api/admin/coupons
+ */
 const createCoupon = async (req, res) => {
-    const { code, discountPct, expiresAt, usageLimit, isActive = true } =
-        req.body;
+    const {
+        code,
+        discountType = "PERCENT",
+        discountValue,
+        minCartTotal,
+        expiresAt,
+        usageLimit,
+        isActive = true,
+    } = req.body;
 
-    // Validation
-    if (!code || !discountPct || !expiresAt) {
+    if (!code || !discountValue || !expiresAt) {
         return res.status(400).json({
             success: false,
-            error: "Missing required fields: code, discountPct, expiresAt",
+            error: "Missing required fields: code, discountValue, expiresAt",
         });
     }
 
-    if (discountPct < 1 || discountPct > 100) {
+    if (!["PERCENT", "FIXED"].includes(discountType)) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid discount type. Must be PERCENT or FIXED",
+        });
+    }
+
+    if (discountType === "PERCENT" && (discountValue < 1 || discountValue > 100)) {
         return res.status(400).json({
             success: false,
             error: "Discount percentage must be between 1 and 100",
+        });
+    }
+
+    if (discountType === "FIXED" && discountValue <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Fixed discount amount must be greater than 0",
         });
     }
 
@@ -132,11 +161,20 @@ const createCoupon = async (req, res) => {
         });
     }
 
+    if (minCartTotal !== undefined && minCartTotal < 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Minimum cart total must be 0 or greater",
+        });
+    }
+
     try {
         const coupon = await prisma.coupon.create({
             data: {
                 code: code.toUpperCase().trim(),
-                discountPct: Number(discountPct),
+                discountType,
+                discountValue: Number(discountValue),
+                minCartTotal: minCartTotal ? Number(minCartTotal) : null,
                 expiresAt: expirationDate,
                 usageLimit: usageLimit ? Number(usageLimit) : null,
                 isActive,
@@ -166,13 +204,16 @@ const createCoupon = async (req, res) => {
     }
 };
 
-// Update coupon (Admin only)
+/**
+ * Update coupon (Admin only)
+ * PUT /api/admin/coupons/:id
+ */
 const updateCoupon = async (req, res) => {
     const { id } = req.params;
-    const { code, discountPct, expiresAt, usageLimit, isActive } = req.body;
+    const { code, discountType, discountValue, minCartTotal, expiresAt, usageLimit, isActive } =
+        req.body;
 
     try {
-        // Check if coupon exists
         const existingCoupon = await prisma.coupon.findUnique({
             where: { id },
         });
@@ -184,21 +225,50 @@ const updateCoupon = async (req, res) => {
             });
         }
 
-        // Validation
         const updateData = {};
 
         if (code !== undefined) {
             updateData.code = code.toUpperCase().trim();
         }
 
-        if (discountPct !== undefined) {
-            if (discountPct < 1 || discountPct > 100) {
+        if (discountType !== undefined) {
+            if (!["PERCENT", "FIXED"].includes(discountType)) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid discount type. Must be PERCENT or FIXED",
+                });
+            }
+            updateData.discountType = discountType;
+        }
+
+        if (discountValue !== undefined) {
+            const type = discountType || existingCoupon.discountType;
+
+            if (type === "PERCENT" && (discountValue < 1 || discountValue > 100)) {
                 return res.status(400).json({
                     success: false,
                     error: "Discount percentage must be between 1 and 100",
                 });
             }
-            updateData.discountPct = Number(discountPct);
+
+            if (type === "FIXED" && discountValue <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Fixed discount amount must be greater than 0",
+                });
+            }
+
+            updateData.discountValue = Number(discountValue);
+        }
+
+        if (minCartTotal !== undefined) {
+            if (minCartTotal !== null && minCartTotal < 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Minimum cart total must be 0 or greater",
+                });
+            }
+            updateData.minCartTotal = minCartTotal ? Number(minCartTotal) : null;
         }
 
         if (expiresAt !== undefined) {
@@ -253,7 +323,10 @@ const updateCoupon = async (req, res) => {
     }
 };
 
-// Delete coupon (Admin only)
+/**
+ * Delete coupon (Admin only)
+ * DELETE /api/admin/coupons/:id
+ */
 const deleteCoupon = async (req, res) => {
     const { id } = req.params;
 
@@ -269,8 +342,6 @@ const deleteCoupon = async (req, res) => {
             });
         }
 
-        // Soft delete by deactivating instead of hard delete
-        // This preserves historical data
         await prisma.coupon.update({
             where: { id },
             data: { isActive: false },
@@ -289,7 +360,10 @@ const deleteCoupon = async (req, res) => {
     }
 };
 
-// Toggle coupon active status (Admin only)
+/**
+ * Toggle coupon active status (Admin only)
+ * PATCH /api/admin/coupons/:id/toggle
+ */
 const toggleCouponStatus = async (req, res) => {
     const { id } = req.params;
 
@@ -324,7 +398,10 @@ const toggleCouponStatus = async (req, res) => {
     }
 };
 
-// Validate and apply coupon (Public - for checkout preview)
+/**
+ * Validate and apply coupon (Public - for checkout preview)
+ * POST /api/coupons/validate
+ */
 const validateCoupon = async (req, res) => {
     const { code, cartTotal } = req.body;
 
@@ -354,7 +431,6 @@ const validateCoupon = async (req, res) => {
             });
         }
 
-        // Validation checks
         if (!coupon.isActive) {
             return res.status(400).json({
                 success: false,
@@ -377,20 +453,35 @@ const validateCoupon = async (req, res) => {
             });
         }
 
-        // Calculate discount
-        const discount = (cartTotal * coupon.discountPct) / 100;
-        const finalTotal = cartTotal - discount;
+        if (coupon.minCartTotal && cartTotal < parseFloat(coupon.minCartTotal)) {
+            return res.status(400).json({
+                success: false,
+                error: `Minimum cart total of ${coupon.minCartTotal} required`,
+                minCartTotal: coupon.minCartTotal,
+            });
+        }
+
+        let discount;
+        if (coupon.discountType === "PERCENT") {
+            discount = (cartTotal * coupon.discountValue) / 100;
+        } else {
+            discount = Math.min(coupon.discountValue, cartTotal);
+        }
+
+        const finalTotal = Math.max(cartTotal - discount, 0);
 
         return res.status(200).json({
             success: true,
             message: "Coupon is valid",
             data: {
                 code: coupon.code,
-                discountPct: coupon.discountPct,
+                discountType: coupon.discountType,
+                discountValue: coupon.discountValue,
                 discountAmount: discount.toFixed(2),
-                originalTotal: cartTotal.toFixed(2),
+                originalTotal: cartTotal,
                 finalTotal: finalTotal.toFixed(2),
                 expiresAt: coupon.expiresAt,
+                minCartTotal: coupon.minCartTotal,
             },
         });
     } catch (error) {
@@ -402,7 +493,195 @@ const validateCoupon = async (req, res) => {
     }
 };
 
-// Get coupon usage statistics (Admin only)
+/**
+ * Apply coupon to cart
+ * POST /api/cart/coupon
+ */
+const applyCoupon = async (req, res) => {
+    const userId = req.user.id;
+    const { code } = req.body;
+
+    if (!code || typeof code !== "string") {
+        return res.status(400).json({
+            success: false,
+            error: "Coupon code is required",
+        });
+    }
+
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            const cart = await tx.cart.findFirst({
+                where: { userId, status: "ACTIVE" },
+                include: {
+                    items: {
+                        include: {
+                            variant: {
+                                include: {
+                                    product: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+
+            if (!cart) {
+                throw new Error("Cart not found");
+            }
+
+            if (cart.items.length === 0) {
+                throw new Error("Cannot apply coupon to empty cart");
+            }
+
+            const coupon = await tx.coupon.findUnique({
+                where: { code: code.toUpperCase() },
+            });
+
+            if (!coupon) {
+                throw new Error("Invalid coupon code");
+            }
+
+            if (!coupon.isActive) {
+                throw new Error("This coupon is no longer active");
+            }
+
+            if (new Date() > coupon.expiresAt) {
+                throw new Error("This coupon has expired");
+            }
+
+            if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+                throw new Error("This coupon has reached its usage limit");
+            }
+
+            const pricing = calculatePricing({
+                items: cart.items,
+                coupon,
+                taxRate: cart.taxRate ? parseFloat(cart.taxRate) : 0,
+            });
+
+            if (!pricing.couponId) {
+                if (
+                    coupon.minCartTotal &&
+                    parseFloat(pricing.subtotal) < parseFloat(coupon.minCartTotal)
+                ) {
+                    throw new Error(`Minimum cart total of ${coupon.minCartTotal} required`);
+                }
+                throw new Error("Coupon requirements not met");
+            }
+
+            await tx.cart.update({
+                where: { id: cart.id },
+                data: {
+                    couponId: coupon.id,
+                    subtotal: pricing.subtotal,
+                    discountPct: pricing.discountPct,
+                    discountAmount: pricing.discountAmount,
+                    taxAmount: pricing.taxAmount,
+                    total: pricing.total,
+                },
+            });
+
+            return { coupon, pricing };
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Coupon applied successfully",
+            data: {
+                coupon: {
+                    code: result.coupon.code,
+                    discountType: result.coupon.discountType,
+                    discountValue: result.coupon.discountValue,
+                },
+                summary: {
+                    subtotal: result.pricing.subtotal,
+                    discountAmount: result.pricing.discountAmount,
+                    taxAmount: result.pricing.taxAmount,
+                    total: result.pricing.total,
+                },
+            },
+        });
+    } catch (error) {
+        console.error("Apply coupon error:", error);
+        return res.status(400).json({
+            success: false,
+            error: error.message || "Failed to apply coupon",
+        });
+    }
+};
+
+/**
+ * Remove coupon from cart
+ * DELETE /api/cart/coupon
+ */
+const removeCoupon = async (req, res) => {
+    const userId = req.user.id;
+
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            const cart = await tx.cart.findFirst({
+                where: { userId, status: "ACTIVE" },
+                include: {
+                    items: {
+                        include: {
+                            variant: {
+                                include: {
+                                    product: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+
+            if (!cart) {
+                throw new Error("Cart not found");
+            }
+
+            const pricing = calculatePricing({
+                items: cart.items,
+                coupon: null,
+                taxRate: cart.taxRate ? parseFloat(cart.taxRate) : 0,
+            });
+
+            await tx.cart.update({
+                where: { id: cart.id },
+                data: {
+                    couponId: null,
+                    subtotal: pricing.subtotal,
+                    discountPct: null,
+                    discountAmount: null,
+                    taxAmount: pricing.taxAmount,
+                    total: pricing.total,
+                },
+            });
+
+            return pricing;
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Coupon removed successfully",
+            data: {
+                summary: {
+                    subtotal: result.subtotal,
+                    total: result.total,
+                },
+            },
+        });
+    } catch (error) {
+        console.error("Remove coupon error:", error);
+        return res.status(400).json({
+            success: false,
+            error: error.message || "Failed to remove coupon",
+        });
+    }
+};
+
+/**
+ * Get coupon usage statistics (Admin only)
+ * GET /api/admin/coupons/:id/stats
+ */
 const getCouponStats = async (req, res) => {
     const { id } = req.params;
 
@@ -418,11 +697,11 @@ const getCouponStats = async (req, res) => {
             });
         }
 
-        // Note: This requires audit logs or order tracking
-        // For now, returning basic stats from the coupon itself
         const stats = {
             code: coupon.code,
-            discountPct: coupon.discountPct,
+            discountType: coupon.discountType,
+            discountValue: coupon.discountValue,
+            minCartTotal: coupon.minCartTotal,
             totalUses: coupon.usedCount,
             usageLimit: coupon.usageLimit,
             remainingUses: coupon.usageLimit
@@ -449,14 +728,26 @@ const getCouponStats = async (req, res) => {
     }
 };
 
-// Bulk create coupons (Admin only)
+/**
+ * Bulk create coupons (Admin only)
+ * POST /api/admin/coupons/bulk
+ */
 const bulkCreateCoupons = async (req, res) => {
-    const { prefix, count, discountPct, expiresAt, usageLimit, isActive = true } = req.body;
+    const {
+        prefix,
+        count,
+        discountType = "PERCENT",
+        discountValue,
+        minCartTotal,
+        expiresAt,
+        usageLimit,
+        isActive = true,
+    } = req.body;
 
-    if (!prefix || !count || !discountPct || !expiresAt) {
+    if (!prefix || !count || !discountValue || !expiresAt) {
         return res.status(400).json({
             success: false,
-            error: "Missing required fields: prefix, count, discountPct, expiresAt",
+            error: "Missing required fields: prefix, count, discountValue, expiresAt",
         });
     }
 
@@ -467,10 +758,24 @@ const bulkCreateCoupons = async (req, res) => {
         });
     }
 
-    if (discountPct < 1 || discountPct > 100) {
+    if (!["PERCENT", "FIXED"].includes(discountType)) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid discount type. Must be PERCENT or FIXED",
+        });
+    }
+
+    if (discountType === "PERCENT" && (discountValue < 1 || discountValue > 100)) {
         return res.status(400).json({
             success: false,
             error: "Discount percentage must be between 1 and 100",
+        });
+    }
+
+    if (discountType === "FIXED" && discountValue <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Fixed discount amount must be greater than 0",
         });
     }
 
@@ -482,23 +787,31 @@ const bulkCreateCoupons = async (req, res) => {
         });
     }
 
+    if (minCartTotal !== undefined && minCartTotal < 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Minimum cart total must be 0 or greater",
+        });
+    }
+
     try {
         const couponsData = [];
         const generatedCodes = new Set();
 
-        // Generate unique coupon codes
         for (let i = 0; i < count; i++) {
             let code;
             do {
                 const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
                 code = `${prefix.toUpperCase()}-${randomStr}`;
             } while (generatedCodes.has(code));
-            
+
             generatedCodes.add(code);
-            
+
             couponsData.push({
                 code,
-                discountPct: Number(discountPct),
+                discountType,
+                discountValue: Number(discountValue),
+                minCartTotal: minCartTotal ? Number(minCartTotal) : null,
                 expiresAt: expirationDate,
                 usageLimit: usageLimit ? Number(usageLimit) : null,
                 isActive,
@@ -506,7 +819,6 @@ const bulkCreateCoupons = async (req, res) => {
             });
         }
 
-        // Create all coupons
         const result = await prisma.coupon.createMany({
             data: couponsData,
             skipDuplicates: true,
@@ -533,6 +845,8 @@ export {
     getAllCoupons,
     getCouponById,
     createCoupon,
+    applyCoupon,
+    removeCoupon,
     updateCoupon,
     deleteCoupon,
     toggleCouponStatus,

@@ -17,7 +17,8 @@ import {
   Clock,
   BarChart3,
   Trash2,
-  X,
+  DollarSign,
+  ShoppingCart,
   LoaderIcon,
 } from "lucide-react";
 import DashboardHeadingBox from "@/components/ui/DashboardHeadingBox";
@@ -28,7 +29,9 @@ const EditCoupon = () => {
   const [formData, setFormData] = useState({
     id: "",
     code: "",
-    discountPct: "",
+    discountType: "PERCENT",
+    discountValue: "",
+    minCartTotal: "",
     expiresAt: "",
     usageLimit: "",
     isActive: true,
@@ -64,7 +67,9 @@ const EditCoupon = () => {
         const formattedData = {
           id: coupon.id,
           code: coupon.code,
-          discountPct: coupon.discountPct,
+          discountType: coupon.discountType || "PERCENT",
+          discountValue: coupon.discountValue,
+          minCartTotal: coupon.minCartTotal || "",
           expiresAt: formattedDate,
           usageLimit: coupon.usageLimit || "",
           isActive: coupon.isActive,
@@ -119,14 +124,15 @@ const EditCoupon = () => {
       newErrors.code = "Coupon code must be at least 3 characters";
     }
 
-    if (!formData.discountPct) {
-      newErrors.discountPct = "Discount percentage is required";
+    if (!formData.discountValue) {
+      newErrors.discountValue = "Discount value is required";
+    } else if (isNaN(formData.discountValue) || formData.discountValue <= 0) {
+      newErrors.discountValue = "Discount value must be greater than 0";
     } else if (
-      isNaN(formData.discountPct) ||
-      formData.discountPct < 1 ||
-      formData.discountPct > 100
+      formData.discountType === "PERCENT" &&
+      (formData.discountValue < 1 || formData.discountValue > 100)
     ) {
-      newErrors.discountPct = "Discount must be between 1 and 100";
+      newErrors.discountValue = "Discount percentage must be between 1 and 100";
     }
 
     if (!formData.expiresAt) {
@@ -143,6 +149,13 @@ const EditCoupon = () => {
       (isNaN(formData.usageLimit) || formData.usageLimit < formData.usedCount)
     ) {
       newErrors.usageLimit = `Usage limit cannot be less than current usage count (${formData.usedCount})`;
+    }
+
+    if (
+      formData.minCartTotal &&
+      (isNaN(formData.minCartTotal) || formData.minCartTotal < 0)
+    ) {
+      newErrors.minCartTotal = "Minimum cart total must be 0 or greater";
     }
 
     setErrors(newErrors);
@@ -183,13 +196,15 @@ const EditCoupon = () => {
     try {
       const payload = {
         code: formData.code.toUpperCase().trim(),
-        discountPct: Number(formData.discountPct),
+        discountType: formData.discountType,
+        discountValue: Number(formData.discountValue),
+        minCartTotal: formData.minCartTotal ? Number(formData.minCartTotal) : null,
         expiresAt: formData.expiresAt,
         usageLimit: formData.usageLimit ? Number(formData.usageLimit) : null,
         isActive: formData.isActive,
       };
 
-      const { data } = await axios.patch(
+      const { data } = await axios.put(
         `${baseUrl}/coupons/${couponID}`,
         payload,
         {
@@ -252,7 +267,9 @@ const EditCoupon = () => {
     if (!originalData) return false;
     return (
       formData.code !== originalData.code ||
-      formData.discountPct !== originalData.discountPct ||
+      formData.discountType !== originalData.discountType ||
+      formData.discountValue !== originalData.discountValue ||
+      formData.minCartTotal !== originalData.minCartTotal ||
       formData.expiresAt !== originalData.expiresAt ||
       formData.usageLimit !== originalData.usageLimit ||
       formData.isActive !== originalData.isActive
@@ -265,6 +282,13 @@ const EditCoupon = () => {
       month: "long",
       day: "numeric",
     });
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
   };
 
   const DeleteModal = () => {
@@ -525,42 +549,116 @@ const EditCoupon = () => {
                 </p>
               </div>
 
-              {/* Discount Percentage Field */}
+              {/* Discount Type Field */}
               <div>
                 <label
-                  htmlFor="discountPct"
+                  htmlFor="discountType"
                   className="flex items-center gap-2 text-gray-800 font-semibold mb-3"
                 >
                   <Percent size={18} className="text-black" />
-                  Discount Percentage
+                  Discount Type
+                  <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="discountType"
+                  name="discountType"
+                  value={formData.discountType}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black transition-colors text-gray-800 bg-white"
+                >
+                  <option value="PERCENT">Percentage Discount</option>
+                  <option value="FIXED">Fixed Amount Discount</option>
+                </select>
+                <p className="text-gray-500 text-xs mt-2">
+                  Choose whether the discount is a percentage of the cart total or a fixed dollar amount.
+                </p>
+              </div>
+
+              {/* Discount Value Field */}
+              <div>
+                <label
+                  htmlFor="discountValue"
+                  className="flex items-center gap-2 text-gray-800 font-semibold mb-3"
+                >
+                  {formData.discountType === "PERCENT" ? (
+                    <Percent size={18} className="text-black" />
+                  ) : (
+                    <DollarSign size={18} className="text-black" />
+                  )}
+                  Discount Value
                   <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="number"
-                    id="discountPct"
-                    name="discountPct"
-                    value={formData.discountPct}
+                    id="discountValue"
+                    name="discountValue"
+                    value={formData.discountValue}
                     onChange={handleInputChange}
-                    placeholder="e.g., 10, 25, 50"
+                    placeholder={
+                      formData.discountType === "PERCENT"
+                        ? "e.g., 10, 25, 50"
+                        : "e.g., 5, 10, 20"
+                    }
                     min="1"
-                    max="100"
+                    max={formData.discountType === "PERCENT" ? "100" : undefined}
+                    step={formData.discountType === "FIXED" ? "0.01" : "1"}
                     className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-black transition-colors text-gray-800 ${
-                      errors.discountPct ? "border-red-500" : "border-gray-300"
+                      errors.discountValue ? "border-red-500" : "border-gray-300"
                     }`}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
-                    %
+                    {formData.discountType === "PERCENT" ? "%" : "$"}
                   </span>
                 </div>
-                {errors.discountPct && (
+                {errors.discountValue && (
                   <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
                     <AlertCircle size={12} />
-                    {errors.discountPct}
+                    {errors.discountValue}
                   </p>
                 )}
                 <p className="text-gray-500 text-xs mt-2">
-                  Enter a percentage between 1 and 100.
+                  {formData.discountType === "PERCENT"
+                    ? "Enter a percentage between 1 and 100."
+                    : "Enter a dollar amount greater than 0."}
+                </p>
+              </div>
+
+              {/* Minimum Cart Total Field */}
+              <div>
+                <label
+                  htmlFor="minCartTotal"
+                  className="flex items-center gap-2 text-gray-800 font-semibold mb-3"
+                >
+                  <ShoppingCart size={18} className="text-black" />
+                  Minimum Cart Total
+                  <span className="text-gray-500 text-xs font-normal">
+                    (Optional)
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    id="minCartTotal"
+                    name="minCartTotal"
+                    value={formData.minCartTotal}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 50, 100"
+                    min="0"
+                    step="0.01"
+                    className={`w-full pl-8 pr-4 py-3 border rounded-lg focus:outline-none focus:border-black transition-colors text-gray-800 ${
+                      errors.minCartTotal ? "border-red-500" : "border-gray-300"
+                    }`}
+                  />
+                </div>
+                {errors.minCartTotal && (
+                  <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.minCartTotal}
+                  </p>
+                )}
+                <p className="text-gray-500 text-xs mt-2">
+                  Set a minimum cart total required to use this coupon. Leave empty for no minimum.
                 </p>
               </div>
 
@@ -703,7 +801,7 @@ const EditCoupon = () => {
           </div>
 
           {/* Preview Section */}
-          {formData.code && formData.discountPct && (
+          {formData.code && formData.discountValue && (
             <div className="mt-6 bg-white border border-gray-200 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 Preview
@@ -717,21 +815,32 @@ const EditCoupon = () => {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-5xl font-bold">{formData.discountPct}%</p>
+                    <p className="text-5xl font-bold">
+                      {formData.discountType === "PERCENT"
+                        ? `${formData.discountValue}%`
+                        : formatCurrency(formData.discountValue)}
+                    </p>
                     <p className="text-sm opacity-90 mt-1">OFF</p>
                   </div>
                 </div>
-                {formData.expiresAt && (
+                {(formData.expiresAt || formData.minCartTotal) && (
                   <div className="mt-4 pt-4 border-t border-white/20">
-                    <p className="text-xs opacity-75">
-                      Valid until:{" "}
-                      {new Date(formData.expiresAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </p>
-                    <div className="flex items-center justify-between mt-2">
+                    {formData.expiresAt && (
+                      <p className="text-xs opacity-75 mb-2">
+                        Valid until:{" "}
+                        {new Date(formData.expiresAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      {formData.minCartTotal && (
+                        <p className="text-xs opacity-75">
+                          Min. cart total: {formatCurrency(formData.minCartTotal)}
+                        </p>
+                      )}
                       {formData.usageLimit && (
                         <p className="text-xs opacity-75">
                           {formData.usedCount} / {formData.usageLimit} uses

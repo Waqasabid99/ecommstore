@@ -30,7 +30,7 @@ const getDateRanges = (period = "30d") => {
 };
 
 // Helper: Format currency
-const formatCurrency = (value) => new Decimal(value).toFixed(2);
+const formatCurrency = (value) => new Decimal(value || 0).toFixed(2);
 
 /**
  * Get main dashboard statistics (KPI cards)
@@ -49,7 +49,7 @@ const getStatsOverview = async (req, res) => {
           status: { in: ["PAID", "SHIPPED", "DELIVERED"] },
           deletedAt: null,
         },
-        _sum: { totalAmount: true },
+        _sum: { total: true },
         _count: { id: true },
       });
 
@@ -63,7 +63,7 @@ const getStatsOverview = async (req, res) => {
           status: { in: ["PAID", "SHIPPED", "DELIVERED"] },
           deletedAt: null,
         },
-        _sum: { totalAmount: true },
+        _sum: { total: true },
       });
 
       // 3. Total customers (unique users who placed orders in period)
@@ -117,8 +117,8 @@ const getStatsOverview = async (req, res) => {
       });
 
       // Calculate trend percentages
-      const currentRevenue = new Decimal(revenueStats._sum.totalAmount || 0);
-      const prevRevenue = new Decimal(prevRevenueStats._sum.totalAmount || 0);
+      const currentRevenue = new Decimal(revenueStats._sum.total || 0);
+      const prevRevenue = new Decimal(prevRevenueStats._sum.total || 0);
       const revenueTrend = prevRevenue.isZero() 
         ? 100 
         : currentRevenue.minus(prevRevenue).dividedBy(prevRevenue).times(100).toFixed(1);
@@ -140,7 +140,6 @@ const getStatsOverview = async (req, res) => {
         orders: {
           pending: pendingOrders,
           completed: revenueStats._count.id,
-          totalOrders: customerStats.reduce((sum, s) => sum + s._count.userId, 0),
         },
         inventory: {
           lowStock: lowStockCount,
@@ -182,7 +181,7 @@ const getSalesAnalytics = async (req, res) => {
         deletedAt: null,
       },
       select: {
-        totalAmount: true,
+        total: true,
         createdAt: true,
       },
       orderBy: { createdAt: "asc" },
@@ -202,7 +201,7 @@ const getSalesAnalytics = async (req, res) => {
       if (!acc[key]) {
         acc[key] = { date: key, revenue: new Decimal(0), orders: 0 };
       }
-      acc[key].revenue = acc[key].revenue.plus(order.totalAmount);
+      acc[key].revenue = acc[key].revenue.plus(order.total);
       acc[key].orders += 1;
       return acc;
     }, {});
@@ -293,12 +292,13 @@ const getRecentActivity = async (req, res) => {
           order: {
             createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
             status: { notIn: ["CANCELLED"] },
+            deletedAt: null,
           },
         },
         _sum: { quantity: true },
         _count: { orderId: true },
-        take: 5,
         orderBy: { _sum: { quantity: "desc" } },
+        take: 5,
       }),
       
       // Recent new users
@@ -323,7 +323,13 @@ const getRecentActivity = async (req, res) => {
           where: { id: item.variantId },
           include: {
             product: {
-              select: { name: true, images: { where: { isMain: true }, take: 1 } },
+              select: { 
+                name: true, 
+                images: { 
+                  where: { isMain: true }, 
+                  take: 1 
+                } 
+              },
             },
           },
         });
@@ -345,7 +351,7 @@ const getRecentActivity = async (req, res) => {
           id: order.id,
           customer: order.user?.userName || "Guest",
           email: order.user?.email,
-          total: formatCurrency(order.totalAmount),
+          total: formatCurrency(order.total),
           status: order.status,
           itemCount: order.items.reduce((sum, i) => sum + i.quantity, 0),
           createdAt: order.createdAt,
@@ -466,7 +472,7 @@ const getOrderStatusDistribution = async (req, res) => {
         deletedAt: null,
       },
       _count: { status: true },
-      _sum: { totalAmount: true },
+      _sum: { total: true },
     });
 
     const total = statusCounts.reduce((sum, s) => sum + s._count.status, 0);
@@ -475,7 +481,7 @@ const getOrderStatusDistribution = async (req, res) => {
       status: item.status,
       count: item._count.status,
       percentage: total > 0 ? ((item._count.status / total) * 100).toFixed(1) : 0,
-      revenue: formatCurrency(item._sum.totalAmount || 0),
+      revenue: formatCurrency(item._sum.total || 0),
     }));
 
     return res.status(200).json({
@@ -521,6 +527,7 @@ const getDetailedAnalytics = async (req, res) => {
           order: {
             createdAt: { gte: start, lte: end },
             status: { notIn: ["CANCELLED"] },
+            deletedAt: null,
           },
         },
         _sum: {
@@ -551,8 +558,9 @@ const getDetailedAnalytics = async (req, res) => {
         where: {
           createdAt: { gte: start, lte: end },
           status: { notIn: ["CANCELLED"] },
+          deletedAt: null,
         },
-        _avg: { totalAmount: true },
+        _avg: { total: true },
         _count: { id: true },
       }),
     ]);
@@ -564,7 +572,11 @@ const getDetailedAnalytics = async (req, res) => {
         where: { id: item.variantId },
         include: {
           product: {
-            select: { category: { select: { name: true } } },
+            select: { 
+              category: { 
+                select: { name: true } 
+              } 
+            },
           },
         },
       });
@@ -593,7 +605,7 @@ const getDetailedAnalytics = async (req, res) => {
         couponStats: {
           totalUsed: analytics[2],
         },
-        averageOrderValue: formatCurrency(analytics[3]._avg.totalAmount || 0),
+        averageOrderValue: formatCurrency(analytics[3]._avg.total || 0),
         totalOrders: analytics[3]._count.id,
       },
       dateRange: { start, end },

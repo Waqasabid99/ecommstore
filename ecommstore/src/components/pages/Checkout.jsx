@@ -47,6 +47,11 @@ const Checkout = () => {
   const { subtotal } = getCartSummary();
   const orderItems = getCartItems();
 
+  const [discount, setDiscount] = useState(0);
+  const [shipping, setShipping] = useState(0);
+  const [tax, setTax] = useState(0);
+  const [total, setTotal] = useState(subtotal);
+
   const countryOptions = Country.getAllCountries().map((country) => ({
     value: country.isoCode,
     label: country.name,
@@ -150,11 +155,6 @@ const Checkout = () => {
       setAuthError("");
     };
   }, [hasAccount]);
-
-  // Calculate totals
-  const shipping = 299;
-  const tax = subtotal * 0.17;
-  const total = parseInt(subtotal) + shipping + tax;
 
   const handleShippingChange = (e) => {
     const { name, value } = e.target;
@@ -1268,7 +1268,7 @@ const Checkout = () => {
                           Qty: {item.quantity}
                         </p>
                         <p className="text-sm font-semibold text-(--text-heading) mt-1">
-                          Rs. {(item.price * item.quantity).toLocaleString()}
+                          Rs. {total || 0}
                         </p>
                       </div>
                     </div>
@@ -1280,19 +1280,19 @@ const Checkout = () => {
                   <div className="flex justify-between text-sm text-(--text-secondary)">
                     <span>Subtotal</span>
                     <span className="font-medium">
-                      Rs. {subtotal.toLocaleString()}
+                      Rs. {total}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm text-(--text-secondary)">
                     <span>Shipping</span>
                     <span className="font-medium">
-                      Rs. {shipping.toLocaleString()}
+                      Rs. {shipping}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm text-(--text-secondary)">
-                    <span>Tax (17%)</span>
+                    <span>Tax ({tax})</span>
                     <span className="font-medium">
-                      Rs. {Math.round(tax).toLocaleString()}
+                      Rs. {tax}
                     </span>
                   </div>
                   <div className="border-t border-(--border-default) pt-3">
@@ -1301,7 +1301,7 @@ const Checkout = () => {
                         Total
                       </span>
                       <span className="font-bold text-(--text-heading) text-xl">
-                        Rs. {Math.round(total).toLocaleString()}
+                        Rs. {total}
                       </span>
                     </div>
                   </div>

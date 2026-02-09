@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma.js";
 import Decimal from "decimal.js";
+import { calculatePricing } from "../constants/pricing.js";
 
 /**
  * Initiate checkout and create order
@@ -11,6 +12,7 @@ const initiateCheckout = async (req, res) => {
         billingAddressId,
         useSameAddress = true,
         couponCode,
+        shippingMethod = "STANDARD", // STANDARD | EXPRESS
     } = req.body;
 
     if (!shippingAddressId) {
@@ -53,12 +55,7 @@ const initiateCheckout = async (req, res) => {
 
                 const cartItems = cart.items;
 
-                // 2. Validate cart is not empty
-                if (!cartItems || cartItems.length === 0) {
-                    throw new Error("Cart is empty");
-                }
-
-                // 3. Validate inventory for all items
+                // 2. Validate inventory for all items
                 const inventoryIssues = [];
                 for (const item of cartItems) {
                     const variant = item.variant;
@@ -71,7 +68,7 @@ const initiateCheckout = async (req, res) => {
                         continue;
                     }
 
-                    if (!variant.product.isActive) {
+                    if (!variant.product.isActive || variant.product.deletedAt) {
                         inventoryIssues.push({
                             variantId: item.variantId,
                             name: variant.product.name,
@@ -80,7 +77,8 @@ const initiateCheckout = async (req, res) => {
                         continue;
                     }
 
-                    const availableStock = variant.inventory?.quantity || 0;
+                    const availableStock = (variant.inventory?.quantity || 0) - 
+                                         (variant.inventory?.reserved || 0);
                     if (availableStock < item.quantity) {
                         inventoryIssues.push({
                             variantId: item.variantId,
@@ -101,7 +99,7 @@ const initiateCheckout = async (req, res) => {
                     );
                 }
 
-                // 4. Fetch and validate addresses
+                // 3. Fetch and validate addresses
                 const shippingAddress = await tx.address.findFirst({
                     where: { id: shippingAddressId, userId },
                 });
@@ -123,27 +121,29 @@ const initiateCheckout = async (req, res) => {
                     }
                 }
 
-                // 5. Calculate order total and apply coupon if provided
-                let subtotal = new Decimal(0);
-                const orderItemsData = [];
+                // 4. Fetch shipping rate
+                const shippingRate = await tx.shippingRate.findFirst({
+                    where: {
+                        country: shippingAddress.country,
+                        state: shippingAddress.state || undefined,
+                        method: shippingMethod,
+                        isActive: true,
+                    },
+                    orderBy: {
+                        state: 'desc', // Prefer state-specific rates over country-wide
+                    },
+                });
 
-                for (const item of cartItems) {
-                    const itemPrice = new Decimal(item.price);
-                    const itemTotal = itemPrice.times(item.quantity);
-                    subtotal = subtotal.plus(itemTotal);
-
-                    orderItemsData.push({
-                        variantId: item.variantId,
-                        price: itemPrice.toFixed(2),
-                        quantity: item.quantity,
-                    });
+                if (!shippingRate) {
+                    throw new Error(
+                        `No shipping rate found for ${shippingAddress.country}, ${shippingAddress.state} with method ${shippingMethod}`
+                    );
                 }
 
-                let discount = new Decimal(0);
-                let appliedCoupon = null;
-
+                // 5. Validate and fetch coupon if provided
+                let coupon = null;
                 if (couponCode) {
-                    const coupon = await tx.coupon.findUnique({
+                    coupon = await tx.coupon.findUnique({
                         where: { code: couponCode },
                     });
 
@@ -165,40 +165,62 @@ const initiateCheckout = async (req, res) => {
                     ) {
                         throw new Error("Coupon usage limit reached");
                     }
+                }
 
-                    // Calculate discount
-                    discount = subtotal
-                        .times(coupon.discountPct)
-                        .dividedBy(100);
-                    appliedCoupon = coupon;
+                // 6. Calculate order pricing using the centralized function
+                const pricing = calculatePricing({
+                    items: cartItems,
+                    coupon,
+                    shippingRate,
+                    taxRate: 0.08, // TODO: Calculate based on address (use tax service)
+                    address: shippingAddress,
+                });
 
-                    // Increment coupon usage
-                    const updated = await tx.coupon.updateMany({
-                        where: {
-                            id: coupon.id,
-                            isActive: true,
-                            expiresAt: { gt: new Date() },
-                            OR: [
-                                { usageLimit: null },
-                                { usedCount: { lt: coupon.usageLimit } },
-                            ],
-                        },
-                        data: { usedCount: { increment: 1 } },
-                    });
-
-                    if (updated.count === 0) {
-                        throw new Error("Coupon usage limit reached");
+                // 7. Validate minimum cart total for coupon
+                if (coupon && coupon.minCartTotal) {
+                    const subtotalDecimal = new Decimal(pricing.subtotal);
+                    if (subtotalDecimal.lessThan(coupon.minCartTotal)) {
+                        throw new Error(
+                            `Minimum cart total of ${coupon.minCartTotal} required for this coupon`
+                        );
                     }
                 }
 
-                const totalAmount = subtotal.minus(discount);
+                // 8. Validate shipping rate min/max order
+                if (shippingRate.minOrder || shippingRate.maxOrder) {
+                    const subtotalDecimal = new Decimal(pricing.subtotal);
+                    if (shippingRate.minOrder && subtotalDecimal.lessThan(shippingRate.minOrder)) {
+                        throw new Error(
+                            `Minimum order value of ${shippingRate.minOrder} required for this shipping method`
+                        );
+                    }
+                    if (shippingRate.maxOrder && subtotalDecimal.greaterThan(shippingRate.maxOrder)) {
+                        throw new Error(
+                            `Maximum order value of ${shippingRate.maxOrder} exceeded for this shipping method`
+                        );
+                    }
+                }
 
-                // 6. Create Order
+                // 9. Create Order with proper schema fields
                 const order = await tx.order.create({
                     data: {
                         userId,
                         status: "PENDING",
-                        totalAmount: totalAmount.toFixed(2),
+                        
+                        // Pricing breakdown
+                        subtotal: pricing.subtotal,
+                        discountPct: pricing.discountPct,
+                        discountAmount: pricing.discountAmount,
+                        taxRate: pricing.taxRate,
+                        taxAmount: pricing.taxAmount,
+                        shippingMethod: pricing.shippingMethod,
+                        shippingAmount: pricing.shippingAmount,
+                        total: pricing.total,
+                        
+                        // Coupon reference
+                        couponId: pricing.couponId,
+                        
+                        // Address snapshots
                         shippingAddr: {
                             fullName: shippingAddress.fullName,
                             phone: shippingAddress.phone,
@@ -222,46 +244,71 @@ const initiateCheckout = async (req, res) => {
                     },
                 });
 
-                // 7. Create OrderItems
-                await tx.orderItem.createMany({
-                    data: orderItemsData.map((item) => ({
-                        ...item,
+                // 10. Create OrderItems with validated pricing
+                const orderItemsData = pricing.items.map((pricedItem) => {
+                    const cartItem = cartItems.find(ci => ci.variantId === pricedItem.variantId);
+                    return {
                         orderId: order.id,
-                    })),
+                        variantId: pricedItem.variantId,
+                        price: pricedItem.unitPrice,
+                        quantity: pricedItem.quantity,
+                    };
                 });
 
-                // 8. Decrement inventory
+                await tx.orderItem.createMany({
+                    data: orderItemsData,
+                });
+
+                // 11. Reserve inventory (increment reserved count)
                 for (const item of cartItems) {
                     const updated = await tx.inventory.updateMany({
                         where: {
                             variantId: item.variantId,
-                            quantity: { gte: item.quantity },
+                            quantity: { gte: item.quantity }, // Ensure still available
                         },
                         data: {
-                            quantity: { decrement: item.quantity },
+                            reserved: { increment: item.quantity },
                         },
                     });
                     if (updated.count === 0) {
                         throw new Error(
-                            `Inventory changed during checkout for item: ${item.variantId}`
+                            `Inventory changed during checkout for item: ${item.variant.product.name}`
                         );
                     }
                 }
-                console.log(cartItems[0].cart);
-                // 9. Mark cart as CHECKED_OUT
-                if (cartItems[0]) {
-                    await tx.cart.update({
-                        where: { id: cartItems[0].cartId },
-                        data: { status: "CHECKED_OUT" },
+
+                // 12. Increment coupon usage (with race condition protection)
+                if (coupon) {
+                    const updated = await tx.coupon.updateMany({
+                        where: {
+                            id: coupon.id,
+                            isActive: true,
+                            expiresAt: { gt: new Date() },
+                            OR: [
+                                { usageLimit: null },
+                                { usedCount: { lt: coupon.usageLimit } },
+                            ],
+                        },
+                        data: { usedCount: { increment: 1 } },
                     });
+
+                    if (updated.count === 0) {
+                        throw new Error("Coupon usage limit reached during checkout");
+                    }
                 }
 
-                // 10. Clear cart items (optional - keep for order history reference)
-                await tx.cartItem.deleteMany({
-                    where: { cartId: cartItems[0].cartId },
+                // 13. Mark cart as CHECKED_OUT
+                await tx.cart.update({
+                    where: { id: cart.id },
+                    data: { status: "CHECKED_OUT" },
                 });
 
-                // 11. Create audit log
+                // 14. Clear cart items
+                await tx.cartItem.deleteMany({
+                    where: { cartId: cart.id },
+                });
+
+                // 15. Create audit log
                 await tx.auditLog.create({
                     data: {
                         userId,
@@ -269,11 +316,14 @@ const initiateCheckout = async (req, res) => {
                         entity: "Order",
                         entityId: order.id,
                         metadata: {
-                            subtotal: subtotal.toFixed(2),
-                            discount: discount.toFixed(2),
-                            totalAmount: totalAmount.toFixed(2),
-                            itemsCount: orderItemsData.length,
-                            couponCode: appliedCoupon?.code,
+                            subtotal: pricing.subtotal,
+                            discountAmount: pricing.discountAmount,
+                            taxAmount: pricing.taxAmount,
+                            shippingAmount: pricing.shippingAmount,
+                            total: pricing.total,
+                            itemsCount: pricing.itemCount,
+                            couponCode: pricing.couponCode,
+                            shippingMethod: pricing.shippingMethod,
                         },
                         ipAddress: req.ip,
                         userAgent: req.headers["user-agent"],
@@ -282,10 +332,13 @@ const initiateCheckout = async (req, res) => {
 
                 return {
                     orderId: order.id,
-                    totalAmount: totalAmount.toFixed(2),
-                    subtotal: subtotal.toFixed(2),
-                    discount: discount.toFixed(2),
-                    itemsCount: orderItemsData.length,
+                    total: pricing.total,
+                    subtotal: pricing.subtotal,
+                    discountAmount: pricing.discountAmount,
+                    taxAmount: pricing.taxAmount,
+                    shippingAmount: pricing.shippingAmount,
+                    itemsCount: pricing.itemCount,
+                    couponApplied: !!pricing.couponCode,
                 };
             },
             {
@@ -322,9 +375,10 @@ const initiateCheckout = async (req, res) => {
             "Coupon is no longer active",
             "Coupon has expired",
             "Coupon usage limit reached",
+            "Coupon usage limit reached during checkout",
         ];
 
-        if (knownErrors.includes(error.message)) {
+        if (knownErrors.some(known => error.message.includes(known))) {
             return res.status(400).json({
                 success: false,
                 error: error.message,
@@ -345,22 +399,26 @@ const validateCheckout = async (req, res) => {
     const userId = req.user?.id;
 
     try {
-        const cartItems = await prisma.cartItem.findMany({
+        const cart = await prisma.cart.findFirst({
             where: {
                 userId,
-                cart: { status: "ACTIVE" },
+                status: "ACTIVE",
             },
             include: {
-                variant: {
+                items: {
                     include: {
-                        inventory: true,
-                        product: true,
+                        variant: {
+                            include: {
+                                inventory: true,
+                                product: true,
+                            },
+                        },
                     },
                 },
             },
         });
 
-        if (!cartItems || cartItems.length === 0) {
+        if (!cart || cart.items.length === 0) {
             return res.status(400).json({
                 success: false,
                 error: "Cart is empty",
@@ -368,10 +426,10 @@ const validateCheckout = async (req, res) => {
         }
 
         const issues = [];
-        let subtotal = new Decimal(0);
+        const validItems = [];
 
-        for (const item of cartItems) {
-            const variant = item.variantId;
+        for (const item of cart.items) {
+            const variant = item.variant;
 
             if (!variant || variant.deletedAt) {
                 issues.push({
@@ -381,7 +439,7 @@ const validateCheckout = async (req, res) => {
                 continue;
             }
 
-            if (!variant.product.isActive) {
+            if (!variant.product.isActive || variant.product.deletedAt) {
                 issues.push({
                     variantId: item.variantId,
                     name: variant.product.name,
@@ -390,7 +448,8 @@ const validateCheckout = async (req, res) => {
                 continue;
             }
 
-            const availableStock = variant.inventory?.quantity || 0;
+            const availableStock = (variant.inventory?.quantity || 0) - 
+                                  (variant.inventory?.reserved || 0);
             if (availableStock < item.quantity) {
                 issues.push({
                     variantId: item.variantId,
@@ -400,10 +459,7 @@ const validateCheckout = async (req, res) => {
                     issue: "Insufficient stock",
                 });
             } else {
-                const itemTotal = new Decimal(variant.price).times(
-                    item.quantity
-                );
-                subtotal = subtotal.plus(itemTotal);
+                validItems.push(item);
             }
         }
 
@@ -415,12 +471,20 @@ const validateCheckout = async (req, res) => {
             });
         }
 
+        // Calculate pricing for valid items
+        const pricing = calculatePricing({
+            items: validItems,
+            taxRate: 0.08, // Default tax rate
+        });
+
         return res.status(200).json({
             success: true,
             message: "Cart is valid",
             data: {
-                itemsCount: cartItems.length,
-                subtotal: subtotal.toFixed(2),
+                itemsCount: pricing.itemCount,
+                subtotal: pricing.subtotal,
+                estimatedTax: pricing.taxAmount,
+                estimatedTotal: pricing.total,
             },
         });
     } catch (error) {

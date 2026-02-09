@@ -165,17 +165,19 @@ model Category {
 
   products Product[]
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime   @default(now())
+  promotion   Promotion? @relation(fields: [promotionId], references: [id])
+  promotionId String?
 }
 
 model Product {
-  id          String  @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
-  slug        String  @unique
-  description String  @db.Text
+  slug        String   @unique
+  description String   @db.Text
   tag         String[]
   brand       String?
-  isActive    Boolean @default(true)
+  isActive    Boolean  @default(true)
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
@@ -184,9 +186,11 @@ model Product {
   images   ProductImage[]
   reviews  Review[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+  promotion   Promotion? @relation(fields: [promotionId], references: [id])
+  promotionId String?
 
   @@index([categoryId])
   @@index([isActive])
@@ -206,9 +210,11 @@ model ProductVariant {
   cartItems  CartItem[]
   orderItems OrderItem[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+  promotion   Promotion? @relation(fields: [promotionId], references: [id])
+  promotionId String?
 
   @@index([productId])
 }
@@ -236,6 +242,31 @@ model ProductImage {
   isMain Boolean @default(false)
 }
 
+model Promotion {
+  id String @id @default(uuid())
+
+  name        String
+  description String?
+
+  discountType  String // PERCENT | FIXED
+  discountValue Decimal @db.Decimal(10, 2)
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  appliesTo   String // PRODUCT | VARIANT | CATEGORY | CART
+  isStackable Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  products   Product[]
+  variants   ProductVariant[]
+  categories Category[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // =====================
 // CART
 // =====================
@@ -246,11 +277,30 @@ model Cart {
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  sessionId String? @unique
-
-  status CartStatus @default(ACTIVE)
+  sessionId String?    @unique
+  status    CartStatus @default(ACTIVE)
 
   items CartItem[]
+
+  // ===== PRICING BREAKDOWN =====
+  subtotal Decimal @db.Decimal(10, 2)
+
+  // Coupon
+  couponId       String?
+  coupon         Coupon?  @relation(fields: [couponId], references: [id])
+  discountPct    Int?
+  discountAmount Decimal? @db.Decimal(10, 2)
+
+  // Tax
+  taxRate   Decimal? @db.Decimal(5, 2)
+  taxAmount Decimal? @db.Decimal(10, 2)
+
+  // Shipping
+  shippingMethod String?
+  shippingAmount Decimal? @db.Decimal(10, 2)
+
+  // Final
+  total Decimal @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -268,9 +318,10 @@ model CartItem {
   variant   ProductVariant @relation(fields: [variantId], references: [id])
 
   quantity Int
-
   // Snapshots
-  price Decimal
+  price       Decimal
+  originalPrice Decimal?
+  promotionId String?
   name  String
   sku   String
 
@@ -281,22 +332,56 @@ model CartItem {
   @@index([cartId])
 }
 
+model ShippingRate {
+  id String @id @default(uuid())
+
+  country String
+  state   String?
+
+  method String // STANDARD | EXPRESS
+  price  Decimal @db.Decimal(10, 2)
+
+  minOrder Decimal?
+  maxOrder Decimal?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+}
+
 // =====================
 // ORDER & PAYMENT
 // =====================
 
 model Order {
-  id     String @id @default(uuid())
+  id String @id @default(uuid())
+
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  status      OrderStatus @default(PENDING)
-  totalAmount Decimal
+  status OrderStatus @default(PENDING)
+
+  // ===== SNAPSHOT PRICING =====
+  subtotal Decimal @db.Decimal(10, 2)
+
+  couponId       String?
+  coupon         Coupon?  @relation(fields: [couponId], references: [id])
+  discountPct    Int?
+  discountAmount Decimal? @db.Decimal(10, 2)
+
+  taxRate   Decimal
+  taxAmount Decimal @db.Decimal(10, 2)
+
+  shippingMethod String
+  shippingAmount Decimal @db.Decimal(10, 2)
+
+  total Decimal @db.Decimal(10, 2)
 
   shippingAddr Json
   billingAddr  Json
 
-  items   OrderItem[]
+  items OrderItem[]
+
   payment Payment?
   refunds Refund[]
   returns ReturnRequest[]
@@ -307,7 +392,6 @@ model Order {
 
   @@index([userId])
   @@index([status])
-  @@index([createdAt])
 }
 
 model OrderItem {
@@ -367,15 +451,25 @@ model Review {
 // =====================
 
 model Coupon {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  discountPct Int
-  expiresAt   DateTime
-  usageLimit  Int?
-  usedCount   Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id   String @id @default(uuid())
+  code String @unique
+
+  discountType  String @default("PERCENT") // PERCENT | FIXED
+  discountValue Int
+
+  minCartTotal Decimal? @db.Decimal(10, 2)
+
+  expiresAt  DateTime
+  usageLimit Int?
+  usedCount  Int      @default(0)
+
+  isActive Boolean @default(true)
+
+  carts  Cart[]
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // =====================

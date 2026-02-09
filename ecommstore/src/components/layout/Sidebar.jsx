@@ -20,7 +20,8 @@ import {
   Edit,
   Star,
   RefreshCcw,
-  CircleDollarSign
+  CircleDollarSign,
+  TrendingUp
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -62,6 +63,11 @@ const Sidebar = () => {
     name: 'Coupons',
     href: `/admin/${adminID}/coupons`,
     icon: <Tag className="w-5 h-5" />,
+  },
+  {
+    name: 'Promotions',
+    href: `/admin/${adminID}/promotions`,
+    icon: <TrendingUp className="w-5 h-5" />,
   },
   {
     name: 'Customers',

@@ -19,6 +19,7 @@ import returnRouter from "./routes/return.routes.js";
 import contactRouter from "./routes/contactus.routes.js";
 import promotionRouter from "./routes/promotion.routes.js";
 import shippingRouter from "./routes/shipping.routes.js";
+import { hostname } from "os";
 const app = express();
 const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
 
@@ -36,7 +37,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
+app.set("trust proxy", 1);
 app.get("/", (req, res) => {
     res.send("Backend is running");
 });
@@ -58,5 +59,5 @@ app.use("/shipping", shippingRouter);
 app.use("/seed", seedRouter);
 
 app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+    console.log(`Server is running on http://${hostname}:${port}`);
 });

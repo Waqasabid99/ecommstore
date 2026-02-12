@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "prisma generate",
-    "install": "node index.js"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",

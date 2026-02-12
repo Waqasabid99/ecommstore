@@ -6,11 +6,7 @@ export const metadata = {
 }
 
 const page = () => {
-  return (
-    <main>
-      <About />
-    </main>
-  )
+  return <About />
 }
 
 export default page

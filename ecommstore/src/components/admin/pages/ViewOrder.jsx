@@ -70,7 +70,7 @@ const ViewOrder = () => {
     }
   };
 
-  console.log(10);
+  console.log(order);
 
   const handleUpdateStatus = async () => {
     if (!selectedStatus) {
@@ -475,7 +475,7 @@ const ViewOrder = () => {
               <p className="text-sm text-gray-600 mb-1">Total Amount</p>
               <p className="text-2xl font-bold text-gray-900 flex items-center gap-1">
                 <DollarSign size={20} />
-                {order.totalAmount}
+                {order.total}
               </p>
             </div>
 
@@ -574,14 +574,26 @@ const ViewOrder = () => {
                     <span>Subtotal</span>
                     <span className="font-semibold">
                       $
-                      {order.items
-                        .reduce((sum, item) => sum + item.price * item.quantity, 0)
-                        }
+                      {order.subtotal}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Tax</span>
+                    <span className="font-semibold">
+                      $
+                      {order.taxAmount}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Shipping Charges</span>
+                    <span className="font-semibold">
+                      $
+                      {order.shippingAmount}
                     </span>
                   </div>
                   <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t border-gray-200">
                     <span>Total</span>
-                    <span>${order.totalAmount}</span>
+                    <span>${order.total}</span>
                   </div>
                 </div>
               </div>

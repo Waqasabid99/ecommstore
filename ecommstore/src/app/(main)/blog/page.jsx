@@ -5,11 +5,7 @@ export const metadata = {
 }
 
 const page = () => {
-  return (
-    <main>
-      <BlogPage />
-    </main>
-  )
+  return <BlogPage />
 }
 
 export default page

@@ -77,7 +77,7 @@ const Orders = ({ revenue }) => {
         ...(filters.maxAmount && { maxAmount: filters.maxAmount }),
       });
 
-      const { data } = await axios.get(`${baseUrl}/orders?${queryParams}`, {
+      const { data } = await axios.get(`${baseUrl}/orders`, {
         withCredentials: true,
       });
 
@@ -100,7 +100,7 @@ const Orders = ({ revenue }) => {
           pending: pendingCount,
           paid: paidCount,
           delivered: deliveredCount,
-          totalRevenue,
+          // totalRevenue,
         });
       }
     } catch (error) {
@@ -438,10 +438,10 @@ const Orders = ({ revenue }) => {
               },
               {
                 header: "Total",
-                key: "totalAmount",
+                key: "total",
                 render: (_, order) => (
                   <span className="font-bold text-green-600">
-                    ${Number(order.totalAmount)}
+                    ${Number(order.total)}
                   </span>
                 ),
               },

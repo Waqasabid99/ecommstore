@@ -8,12 +8,7 @@ export const metadata = {
 
 const page = async () => {
    const {data: products} = await getProducts();
-   console.log(products)
-  return (
-    <div>
-      <SingleProductPage products={products} />
-    </div>
-  )
+  return <SingleProductPage products={products} />  
 }
 
 export default page

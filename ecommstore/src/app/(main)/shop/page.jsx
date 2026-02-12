@@ -11,12 +11,8 @@ const page = async () => {
   const products = await getProducts();
   const {pagination} = await getProducts();
   const categories = await getCategories();
-  console.log(products)
-  return (
-    <main>
-      <ShopPage products={products} categories={categories} pagination={pagination} />
-    </main>
-  )
+  return <ShopPage products={products} categories={categories} pagination={pagination} />
+
 }
 
 export default page

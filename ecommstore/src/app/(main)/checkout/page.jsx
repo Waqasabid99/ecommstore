@@ -6,11 +6,8 @@ export const metadata = {
 }
 
 const page = () => {
-  return (
-    <main>
-      <Checkout />
-    </main>
-  )
+  return <Checkout />
+ 
 }
 
 export default page

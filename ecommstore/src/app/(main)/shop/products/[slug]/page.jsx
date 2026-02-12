@@ -3,11 +3,8 @@ import { getProducts } from "@/lib/api/product"
 
 const page = async () => {
     const products = await getProducts();
-  return (
-    <div>
-        <SingleProductPage products={products} />
-    </div>
-  )
+  return <SingleProductPage products={products} />
+
 }
 
 export default page

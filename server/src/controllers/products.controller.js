@@ -1,15 +1,95 @@
 import { prisma } from "../config/prisma.js";
 import { uploadBuffer, deleteImage } from "../constants/uploadToCloudinary.js";
+import { getPromotionStatus } from "../constants/constants.js";
 import slugify from "slugify";
 import fs from "fs";
 
-// Get all products
+// Get active promotions for products/variants
+const getActivePromotions = async (entityType, entityIds) => {
+    const now = new Date();
+    
+    const promotions = await prisma.promotion.findMany({
+        where: {
+            isActive: true,
+            startsAt: { lte: now },
+            endsAt: { gte: now },
+            appliesTo: entityType,
+            ...(entityType === "PRODUCT" && {
+                products: { some: { id: { in: entityIds } } },
+            }),
+            ...(entityType === "VARIANT" && {
+                variants: { some: { id: { in: entityIds } } },
+            }),
+        },
+        include: {
+            products: entityType === "PRODUCT",
+            variants: entityType === "VARIANT",
+        },
+    });
+
+    // Map entity IDs to their best promotion (highest discount)
+    const promotionMap = new Map();
+
+    promotions.forEach((promo) => {
+        const entities = entityType === "PRODUCT" ? promo.products : promo.variants;
+        
+        entities.forEach((entity) => {
+            const existing = promotionMap.get(entity.id);
+            
+            // Keep the promotion with higher discount
+            if (!existing || promo.discountValue > existing.discountValue) {
+                promotionMap.set(entity.id, {
+                    id: promo.id,
+                    name: promo.name,
+                    discountType: promo.discountType,
+                    discountValue: promo.discountValue,
+                    isStackable: promo.isStackable,
+                });
+            }
+        });
+    });
+
+    return promotionMap;
+};
+
+// Calculate discounted price based on promotion
+
+const calculateDiscountedPrice = (originalPrice, promotion) => {
+    if (!promotion) return originalPrice;
+
+    const price = parseFloat(originalPrice);
+    
+    if (promotion.discountType === "PERCENT") {
+        return price - (price * parseFloat(promotion.discountValue) / 100);
+    } else {
+        // FIXED discount
+        return Math.max(0, price - parseFloat(promotion.discountValue));
+    }
+};
+
+const getCartPromotions = async () => {
+    const now = new Date();
+    
+    return await prisma.promotion.findMany({
+        where: {
+            isActive: true,
+            startsAt: { lte: now },
+            endsAt: { gte: now },
+            appliesTo: "CART",
+        },
+        orderBy: { discountValue: "desc" },
+    });
+};
+
+// =====================================================
+// GET ALL PRODUCTS
+// =====================================================
 const getAllProducts = async (req, res) => {
     try {
         let { page = 1, limit = 20, categoryId, isActive } = req.query;
 
         page = Math.max(Number(page) || 1, 1);
-        limit = Math.min(Math.max(Number(limit) || 20, 1), 100); // max 100 per page
+        limit = Math.min(Math.max(Number(limit) || 20, 1), 100);
         const skip = (page - 1) * limit;
 
         const filters = {
@@ -25,9 +105,25 @@ const getAllProducts = async (req, res) => {
                     category: { select: { id: true, name: true, slug: true } },
                     variants: {
                         where: { deletedAt: null },
-                        include: { inventory: true },
+                        include: { 
+                            inventory: true,
+                            promotion: {
+                                where: {
+                                    isActive: true,
+                                    startsAt: { lte: new Date() },
+                                    endsAt: { gte: new Date() },
+                                },
+                            },
+                        },
                     },
                     images: true,
+                    promotion: {
+                        where: {
+                            isActive: true,
+                            startsAt: { lte: new Date() },
+                            endsAt: { gte: new Date() },
+                        },
+                    },
                 },
                 orderBy: { createdAt: "desc" },
                 skip,
@@ -38,28 +134,70 @@ const getAllProducts = async (req, res) => {
 
         const productIds = products.map(p => p.id);
 
+        // Get ratings
         const ratings = await prisma.review.groupBy({
-        by: ["productId"],
-        where: {
-            productId: { in: productIds },
-        },
-        _avg: { rating: true },
-        _count: { id: true },
+            by: ["productId"],
+            where: {
+                productId: { in: productIds },
+            },
+            _avg: { rating: true },
+            _count: { id: true },
         });
 
         const ratingMap = new Map(
-        ratings.map(r => [
-            r.productId,
-            {
-            average: Number(r._avg.rating ?? 0),
-            count: r._count.id,
-            }
-        ])
+            ratings.map(r => [
+                r.productId,
+                {
+                    average: Number(r._avg.rating ?? 0),
+                    count: r._count.id,
+                }
+            ])
         );
 
-        // Optional: frontend-friendly transformation
+        // Get active category promotions
+        const categoryIds = [...new Set(products.map(p => p.categoryId))];
+        const now = new Date();
+        const categoryPromotions = await prisma.promotion.findMany({
+            where: {
+                isActive: true,
+                startsAt: { lte: now },
+                endsAt: { gte: now },
+                appliesTo: "CATEGORY",
+                categories: { some: { id: { in: categoryIds } } },
+            },
+            include: {
+                categories: { select: { id: true } },
+            },
+        });
+
+        const categoryPromoMap = new Map();
+        categoryPromotions.forEach((promo) => {
+            promo.categories.forEach((cat) => {
+                const existing = categoryPromoMap.get(cat.id);
+                if (!existing || promo.discountValue > existing.discountValue) {
+                    categoryPromoMap.set(cat.id, {
+                        id: promo.id,
+                        name: promo.name,
+                        discountType: promo.discountType,
+                        discountValue: promo.discountValue,
+                    });
+                }
+            });
+        });
+
+        // Transform products with promotion data
         const transformed = products.map((p) => {
             const rating = ratingMap.get(p.id) ?? { average: 0, count: 0 };
+            
+            // Check for product-level promotion
+            const productPromo = p.promotion;
+            
+            // Check for category-level promotion
+            const categoryPromo = categoryPromoMap.get(p.categoryId);
+            
+            // Use the best available promotion (product > category)
+            const bestPromotion = productPromo || categoryPromo;
+            
             return {
                 id: p.id,
                 name: p.name,
@@ -70,28 +208,52 @@ const getAllProducts = async (req, res) => {
                 isActive: p.isActive,
                 category: p.category,
                 categoryName: p.category?.name ?? null,
-                thumbnail:
-                    p.images.find((i) => i.isMain)?.url || p.images[0]?.url || "",
+                thumbnail: p.images.find((i) => i.isMain)?.url || p.images[0]?.url || "",
                 images: p.images.map((i) => i.url),
-                variants: p.variants.map((v) => ({
-                    id: v.id,
-                    sku: v.sku,
-                    price: v.price,
-                    attributes: v.attributes,
-                    availableQty: v.inventory?.quantity ?? 0,
-                    inStock: (v.inventory?.quantity ?? 0) > 0,
-                    variantsCount: p.variants.length,
-                })),
+                variants: p.variants.map((v) => {
+                    // Variant-specific promotion takes priority
+                    const variantPromo = v.promotion;
+                    const effectivePromo = variantPromo || bestPromotion;
+                    
+                    const originalPrice = parseFloat(v.price);
+                    const discountedPrice = effectivePromo 
+                        ? calculateDiscountedPrice(originalPrice, effectivePromo)
+                        : originalPrice;
+                    
+                    return {
+                        id: v.id,
+                        sku: v.sku,
+                        price: originalPrice,
+                        discountedPrice: discountedPrice !== originalPrice ? discountedPrice : null,
+                        attributes: v.attributes,
+                        availableQty: v.inventory?.quantity ?? 0,
+                        inStock: (v.inventory?.quantity ?? 0) > 0,
+                        promotion: effectivePromo ? {
+                            id: effectivePromo.id,
+                            name: effectivePromo.name,
+                            discountType: effectivePromo.discountType,
+                            discountValue: effectivePromo.discountValue,
+                            savingsAmount: originalPrice - discountedPrice,
+                            savingsPercent: Math.round(((originalPrice - discountedPrice) / originalPrice) * 100),
+                            startsAt: effectivePromo.startsAt,
+                            endsAt: effectivePromo.endsAt,
+                        } : null,
+                    };
+                }),
+                variantsCount: p.variants.length,
                 averageRating: Number(rating.average.toFixed(1)),
                 ratingCount: rating.count,
-                // reviews: p.reviews.map((r) => ({
-                //     id: r.id,
-                //     rating: r.rating,
-                //     comment: r.comment,
-                //     user: r.user,
-                // })),
-            }
+                hasPromotion: !!bestPromotion,
+                promotion: bestPromotion ? {
+                    id: bestPromotion.id,
+                    name: bestPromotion.name,
+                    discountType: bestPromotion.discountType,
+                    discountValue: bestPromotion.discountValue,
+                    endsAt: bestPromotion.endsAt,
+                } : null,
+            };
         });
+
         res.status(200).json({
             success: true,
             data: transformed,
@@ -111,7 +273,9 @@ const getAllProducts = async (req, res) => {
     }
 };
 
-// Get product by ID
+// =====================================================
+// GET PRODUCT BY ID
+// =====================================================
 const getProductById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -122,12 +286,47 @@ const getProductById = async (req, res) => {
                 deletedAt: null,
             },
             include: {
-                reviews: true,
+                reviews: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                userName: true,
+                                email: true,
+                            },
+                        },
+                    },
+                },
                 images: true,
                 variants: {
                     where: { deletedAt: null },
                     include: {
                         inventory: true,
+                        promotion: {
+                            where: {
+                                isActive: true,
+                                startsAt: { lte: new Date() },
+                                endsAt: { gte: new Date() },
+                            },
+                        },
+                    },
+                },
+                promotion: {
+                    where: {
+                        isActive: true,
+                        startsAt: { lte: new Date() },
+                        endsAt: { gte: new Date() },
+                    },
+                },
+                category: {
+                    include: {
+                        promotion: {
+                            where: {
+                                isActive: true,
+                                startsAt: { lte: new Date() },
+                                endsAt: { gte: new Date() },
+                            },
+                        },
                     },
                 },
             },
@@ -139,12 +338,40 @@ const getProductById = async (req, res) => {
                 error: "Product not found",
             });
         }
-        // Get Category
-        const category = await prisma.category.findUnique({
-            where: { id: product.categoryId },
+
+        // Determine best applicable promotion
+        const productPromo = product.promotion;
+        const categoryPromo = product.category.promotion;
+        const bestPromotion = productPromo || categoryPromo;
+
+        // Transform variants with promotion data
+        const transformedVariants = product.variants.map((v) => {
+            const variantPromo = v.promotion;
+            const effectivePromo = variantPromo || bestPromotion;
+            
+            const originalPrice = parseFloat(v.price);
+            const discountedPrice = effectivePromo 
+                ? calculateDiscountedPrice(originalPrice, effectivePromo)
+                : originalPrice;
+
+            return {
+                ...v,
+                price: originalPrice,
+                discountedPrice: discountedPrice !== originalPrice ? discountedPrice : null,
+                promotion: effectivePromo ? {
+                    id: effectivePromo.id,
+                    name: effectivePromo.name,
+                    discountType: effectivePromo.discountType,
+                    discountValue: effectivePromo.discountValue,
+                    savingsAmount: originalPrice - discountedPrice,
+                    savingsPercent: Math.round(((originalPrice - discountedPrice) / originalPrice) * 100),
+                    source: variantPromo ? "variant" : (productPromo ? "product" : "category"),
+                    startsAt: effectivePromo.startsAt,
+                    endsAt: effectivePromo.endsAt,
+                } : null,
+            };
         });
 
-        // Optional: frontend-friendly transformation
         const transformed = {
             id: product.id,
             name: product.name,
@@ -153,20 +380,34 @@ const getProductById = async (req, res) => {
             tag: product.tag,
             brand: product.brand,
             isActive: product.isActive,
-            category: category.id,
-            categoryName: category.name,
+            category: product.category.id,
+            categoryName: product.category.name,
             thumbnail: product.images.find((i) => i.isMain) || "",
             images: product.images.map((i) => i),
             createdAt: product.createdAt,
             updatedAt: product.updatedAt,
-            variants: product.variants,
+            variants: transformedVariants,
             reviews: product.reviews.map((r) => ({
                 id: r.id,
                 rating: r.rating,
                 comment: r.comment,
                 user: r.user,
+                createdAt: r.createdAt,
             })),
+            hasPromotion: !!bestPromotion,
+            promotion: bestPromotion ? {
+                id: bestPromotion.id,
+                name: bestPromotion.name,
+                description: bestPromotion.description,
+                discountType: bestPromotion.discountType,
+                discountValue: bestPromotion.discountValue,
+                startsAt: bestPromotion.startsAt,
+                endsAt: bestPromotion.endsAt,
+                isStackable: bestPromotion.isStackable,
+                source: productPromo ? "product" : "category",
+            } : null,
         };
+
         res.status(200).json({
             success: true,
             data: transformed,
@@ -180,9 +421,11 @@ const getProductById = async (req, res) => {
     }
 };
 
-// Create product
+// =====================================================
+// CREATE PRODUCT
+// =====================================================
 const createProduct = async (req, res) => {
-    const { name, description, brand, categoryId, variants } = req.body;
+    const { name, description, brand, categoryId, variants, promotionId } = req.body;
 
     const isActive = req.body.isActive === "true";
     const thumbnailFile = req.files?.thumbnail?.[0] || null;
@@ -195,15 +438,12 @@ const createProduct = async (req, res) => {
         });
     }
 
-    // ---------------------------
     // Parse tags
-    // ---------------------------
     let tag = [];
     try {
-        tag =
-            typeof req.body.tag === "string"
-                ? JSON.parse(req.body.tag)
-                : (req.body.tag ?? []);
+        tag = typeof req.body.tag === "string"
+            ? JSON.parse(req.body.tag)
+            : (req.body.tag ?? []);
     } catch {
         return res.status(400).json({
             success: false,
@@ -211,9 +451,7 @@ const createProduct = async (req, res) => {
         });
     }
 
-    // ---------------------------
     // Parse variants (required)
-    // ---------------------------
     let parsedVariants;
     try {
         parsedVariants = JSON.parse(variants);
@@ -229,9 +467,7 @@ const createProduct = async (req, res) => {
 
     const slugBase = slugify(name, { lower: true, strict: true });
 
-    // ---------------------------
-    // 1️⃣ Upload images FIRST (outside transaction)
-    // ---------------------------
+    // Upload images FIRST (outside transaction)
     const uploadedImages = [];
 
     try {
@@ -260,9 +496,7 @@ const createProduct = async (req, res) => {
         });
     }
 
-    // ---------------------------
-    // 2️⃣ Database transaction (DB ONLY)
-    // ---------------------------
+    // Database transaction
     try {
         const result = await prisma.$transaction(async (tx) => {
             // Validate category
@@ -272,6 +506,30 @@ const createProduct = async (req, res) => {
 
             if (!category) {
                 throw new Error("Category not found");
+            }
+
+            // Validate promotion if provided
+            if (promotionId) {
+                const promotion = await tx.promotion.findUnique({
+                    where: { id: promotionId },
+                });
+
+                if (!promotion) {
+                    throw new Error("Promotion not found");
+                }
+
+                if (!promotion.isActive) {
+                    throw new Error("Promotion is not active");
+                }
+
+                if (promotion.appliesTo !== "PRODUCT") {
+                    throw new Error("Promotion does not apply to products");
+                }
+
+                const now = new Date();
+                if (now < promotion.startsAt || now > promotion.endsAt) {
+                    throw new Error("Promotion is not currently valid");
+                }
             }
 
             // Ensure slug uniqueness
@@ -291,6 +549,7 @@ const createProduct = async (req, res) => {
                     slug,
                     isActive,
                     categoryId,
+                    promotionId: promotionId || null,
                 },
             });
 
@@ -300,12 +559,28 @@ const createProduct = async (req, res) => {
                     throw new Error("Each variant must have SKU and price");
                 }
 
+                // Validate variant promotion if provided
+                if (variant.promotionId) {
+                    const variantPromo = await tx.promotion.findUnique({
+                        where: { id: variant.promotionId },
+                    });
+
+                    if (!variantPromo) {
+                        throw new Error(`Promotion not found for variant ${variant.sku}`);
+                    }
+
+                    if (variantPromo.appliesTo !== "VARIANT") {
+                        throw new Error(`Promotion does not apply to variants: ${variant.sku}`);
+                    }
+                }
+
                 const createdVariant = await tx.productVariant.create({
                     data: {
                         productId: product.id,
                         sku: variant.sku,
                         price: parseFloat(variant.price),
                         attributes: variant.attributes ?? null,
+                        promotionId: variant.promotionId || null,
                     },
                 });
 
@@ -338,6 +613,7 @@ const createProduct = async (req, res) => {
                         name,
                         slug,
                         categoryId,
+                        promotionId: promotionId || null,
                         variantsCount: parsedVariants.length,
                     },
                 },
@@ -352,9 +628,7 @@ const createProduct = async (req, res) => {
             data: result,
         });
     } catch (error) {
-        // ---------------------------
         // Cleanup Cloudinary uploads if DB fails
-        // ---------------------------
         await Promise.all(
             uploadedImages.map((img) =>
                 deleteImage(img.publicId).catch(() => null)
@@ -370,7 +644,9 @@ const createProduct = async (req, res) => {
     }
 };
 
-// Update Product
+// =====================================================
+// UPDATE PRODUCT
+// =====================================================
 const updateProduct = async (req, res) => {
     const userId = req?.user?.id;
     const { id } = req.params;
@@ -382,6 +658,7 @@ const updateProduct = async (req, res) => {
         categoryId,
         variants,
         removeImageIds,
+        promotionId,
     } = req.body;
     const isActive = req.body.isActive === "true";
     const thumbnailFile = req.files?.thumbnail?.[0];
@@ -405,32 +682,51 @@ const updateProduct = async (req, res) => {
 
     try {
         const result = await prisma.$transaction(async (tx) => {
-            // 1️⃣ Find product
+            // Find product
             const product = await tx.product.findUnique({
                 where: { id },
                 include: { variants: true },
             });
+            
             if (!product) throw new Error("Product not found");
-            const tag =
-                typeof req.body.tag === "string"
-                    ? JSON.parse(req.body.tag)
-                    : req.body.tag;
 
-            // 2️⃣ Update product fields
+            // Validate promotion if provided
+            if (promotionId !== undefined) {
+                if (promotionId) {
+                    const promotion = await tx.promotion.findUnique({
+                        where: { id: promotionId },
+                    });
+
+                    if (!promotion) {
+                        throw new Error("Promotion not found");
+                    }
+
+                    if (promotion.appliesTo !== "PRODUCT") {
+                        throw new Error("Promotion does not apply to products");
+                    }
+                }
+            }
+
+            const parsedTag = typeof req.body.tag === "string"
+                ? JSON.parse(req.body.tag)
+                : req.body.tag;
+
+            // Update product fields
             await tx.product.update({
                 where: { id },
                 data: {
                     name: name ?? product.name,
-                    tag: tag ?? product.tag,
+                    tag: parsedTag ?? product.tag,
                     brand: brand ?? product.brand,
                     slug: slug ?? product.slug,
                     description: description ?? product.description,
                     isActive: isActive ?? product.isActive,
                     categoryId: categoryId ?? product.categoryId,
+                    promotionId: promotionId !== undefined ? promotionId : product.promotionId,
                 },
             });
 
-            // 3️⃣ Process variants
+            // Process variants
             for (const variant of parsedVariants) {
                 if (variant._delete && variant.id) {
                     await tx.productVariant.update({
@@ -441,12 +737,30 @@ const updateProduct = async (req, res) => {
                 }
 
                 if (variant.id) {
+                    // Validate variant promotion
+                    if (variant.promotionId !== undefined && variant.promotionId) {
+                        const variantPromo = await tx.promotion.findUnique({
+                            where: { id: variant.promotionId },
+                        });
+
+                        if (!variantPromo) {
+                            throw new Error(`Promotion not found for variant ${variant.sku}`);
+                        }
+
+                        if (variantPromo.appliesTo !== "VARIANT") {
+                            throw new Error(`Promotion does not apply to variants: ${variant.sku}`);
+                        }
+                    }
+
                     await tx.productVariant.update({
                         where: { id: variant.id },
                         data: {
                             sku: variant.sku,
                             price: parseFloat(variant.price),
                             attributes: variant.attributes ?? null,
+                            promotionId: variant.promotionId !== undefined 
+                                ? variant.promotionId 
+                                : undefined,
                         },
                     });
 
@@ -466,6 +780,7 @@ const updateProduct = async (req, res) => {
                         sku: variant.sku,
                         price: parseFloat(variant.price),
                         attributes: variant.attributes ?? null,
+                        promotionId: variant.promotionId || null,
                     },
                 });
 
@@ -478,7 +793,7 @@ const updateProduct = async (req, res) => {
                 });
             }
 
-            // 4️⃣ Remove images
+            // Remove images
             if (parsedRemoveImages.length > 0) {
                 const imagesToRemove = await tx.productImage.findMany({
                     where: {
@@ -499,7 +814,7 @@ const updateProduct = async (req, res) => {
                 });
             }
 
-            // 5️⃣ Update thumbnail
+            // Update thumbnail
             if (thumbnailFile) {
                 await tx.productImage.updateMany({
                     where: { productId: product.id, isMain: true },
@@ -510,23 +825,25 @@ const updateProduct = async (req, res) => {
                     data: {
                         productId: product.id,
                         url: `/uploads/products/${thumbnailFile.filename}`,
+                        publicId: thumbnailFile.filename,
                         isMain: true,
                     },
                 });
             }
 
-            // 6️⃣ Add new images
+            // Add new images
             if (newImages.length > 0) {
                 await tx.productImage.createMany({
                     data: newImages.map((img) => ({
                         productId: product.id,
                         url: `/uploads/products/${img.filename}`,
+                        publicId: img.filename,
                         isMain: false,
                     })),
                 });
             }
 
-            // 7️⃣ Audit log
+            // Audit log
             await tx.auditLog.create({
                 data: {
                     action: "UPDATE",
@@ -534,10 +851,9 @@ const updateProduct = async (req, res) => {
                     entityId: product.id,
                     metadata: {
                         updatedFields: Object.keys(req.body),
-                        updatedVariants: parsedVariants.map(
-                            (v) => v.id ?? "new"
-                        ),
+                        updatedVariants: parsedVariants.map((v) => v.id ?? "new"),
                         removedImages: parsedRemoveImages,
+                        promotionId: promotionId !== undefined ? promotionId : "unchanged",
                     },
                     ipAddress: req.ip,
                     userAgent: req.headers["user-agent"],
@@ -560,9 +876,10 @@ const updateProduct = async (req, res) => {
         });
 
         if (error.message === "Product not found") {
-            return res
-                .status(404)
-                .json({ success: false, error: "Product not found" });
+            return res.status(404).json({ 
+                success: false, 
+                error: "Product not found" 
+            });
         }
 
         if (error.code === "P2002") {
@@ -573,17 +890,22 @@ const updateProduct = async (req, res) => {
         }
 
         console.error("Update product error:", error);
-        return res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
     }
 };
 
-// Delete Product (Soft Delete)
+// =====================================================
+// DELETE PRODUCT (SOFT DELETE)
+// =====================================================
 const deleteProduct = async (req, res) => {
     const { id } = req.params;
 
     try {
         const result = await prisma.$transaction(async (tx) => {
-            // 1️⃣ Fetch product with variants
+            // Fetch product with variants
             const product = await tx.product.findUnique({
                 where: { id },
                 include: { variants: true },
@@ -597,21 +919,21 @@ const deleteProduct = async (req, res) => {
 
             const deletedAt = new Date();
 
-            // 2️⃣ Soft-delete product
+            // Soft-delete product
             await tx.product.update({
                 where: { id },
                 data: { deletedAt, isActive: false },
             });
 
-            // 3️⃣ Soft-delete variants
+            // Soft-delete variants
             if (product.variants.length > 0) {
                 await tx.productVariant.updateMany({
                     where: { productId: product.id },
-                    data: { deletedAt, isActive: false },
+                    data: { deletedAt },
                 });
             }
 
-            // 4️⃣ Optional: mark affected cart items as 'hasIssues'
+            // Mark affected cart items
             const variantIds = product.variants.map((v) => v.id);
             if (variantIds.length > 0) {
                 await tx.cartItem.updateMany({
@@ -620,7 +942,7 @@ const deleteProduct = async (req, res) => {
                 });
             }
 
-            // 5️⃣ Audit log
+            // Audit log
             await tx.auditLog.create({
                 data: {
                     action: "DELETE",
@@ -630,6 +952,7 @@ const deleteProduct = async (req, res) => {
                         name: product.name,
                         slug: product.slug,
                         categoryId: product.categoryId,
+                        promotionId: product.promotionId,
                         reason: "Product deleted",
                         variantsCount: product.variants.length,
                     },
@@ -643,9 +966,10 @@ const deleteProduct = async (req, res) => {
         });
 
         if (!result) {
-            return res
-                .status(404)
-                .json({ success: false, error: "Product not found" });
+            return res.status(404).json({ 
+                success: false, 
+                error: "Product not found" 
+            });
         }
 
         return res.status(200).json({
@@ -662,10 +986,177 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+// =====================================================
+// ADDITIONAL ENDPOINTS
+// =====================================================
+
+const getProductsByPromotion = async (req, res) => {
+    try {
+        const { promotionId } = req.params;
+        const { page = 1, limit = 20 } = req.query;
+        
+        const skip = (Number(page) - 1) * Number(limit);
+
+        const promotion = await prisma.promotion.findUnique({
+            where: { id: promotionId },
+        });
+
+        if (!promotion) {
+            return res.status(404).json({
+                success: false,
+                error: "Promotion not found",
+            });
+        }
+
+        let products = [];
+        let total = 0;
+
+        if (promotion.appliesTo === "PRODUCT") {
+            [products, total] = await Promise.all([
+                prisma.product.findMany({
+                    where: {
+                        promotionId,
+                        deletedAt: null,
+                        isActive: true,
+                    },
+                    include: {
+                        category: true,
+                        images: true,
+                        variants: {
+                            where: { deletedAt: null },
+                            include: { inventory: true },
+                        },
+                    },
+                    skip,
+                    take: Number(limit),
+                }),
+                prisma.product.count({
+                    where: {
+                        promotionId,
+                        deletedAt: null,
+                        isActive: true,
+                    },
+                }),
+            ]);
+        } else if (promotion.appliesTo === "CATEGORY") {
+            const categoryIds = await prisma.category.findMany({
+                where: { promotionId },
+                select: { id: true },
+            });
+
+            [products, total] = await Promise.all([
+                prisma.product.findMany({
+                    where: {
+                        categoryId: { in: categoryIds.map(c => c.id) },
+                        deletedAt: null,
+                        isActive: true,
+                    },
+                    include: {
+                        category: true,
+                        images: true,
+                        variants: {
+                            where: { deletedAt: null },
+                            include: { inventory: true },
+                        },
+                    },
+                    skip,
+                    take: Number(limit),
+                }),
+                prisma.product.count({
+                    where: {
+                        categoryId: { in: categoryIds.map(c => c.id) },
+                        deletedAt: null,
+                        isActive: true,
+                    },
+                }),
+            ]);
+        }
+
+        // Transform with promotion data
+        const transformed = products.map((p) => {
+            const originalPrice = Math.min(...p.variants.map(v => parseFloat(v.price)));
+            const discountedPrice = calculateDiscountedPrice(originalPrice, promotion);
+
+            return {
+                id: p.id,
+                name: p.name,
+                slug: p.slug,
+                thumbnail: p.images.find(i => i.isMain)?.url || p.images[0]?.url,
+                category: p.category,
+                originalPrice,
+                discountedPrice,
+                savingsAmount: originalPrice - discountedPrice,
+                savingsPercent: Math.round(((originalPrice - discountedPrice) / originalPrice) * 100),
+                variantsCount: p.variants.length,
+                inStock: p.variants.some(v => (v.inventory?.quantity ?? 0) > 0),
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                promotion: {
+                    id: promotion.id,
+                    name: promotion.name,
+                    description: promotion.description,
+                    discountType: promotion.discountType,
+                    discountValue: promotion.discountValue,
+                    startsAt: promotion.startsAt,
+                    endsAt: promotion.endsAt,
+                },
+                products: transformed,
+            },
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
+        });
+    } catch (error) {
+        console.error("Get products by promotion error:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+        });
+    }
+};
+
+const getActiveCartPromotions = async (req, res) => {
+    try {
+        const promotions = await getCartPromotions();
+
+        const transformed = promotions.map((promo) => ({
+            id: promo.id,
+            name: promo.name,
+            description: promo.description,
+            discountType: promo.discountType,
+            discountValue: promo.discountValue,
+            isStackable: promo.isStackable,
+            startsAt: promo.startsAt,
+            endsAt: promo.endsAt,
+            status: getPromotionStatus(promo),
+        }));
+
+        return res.status(200).json({
+            success: true,
+            data: transformed,
+        });
+    } catch (error) {
+        console.error("Get cart promotions error:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+        });
+    }
+};
+
 export {
     getAllProducts,
     getProductById,
     createProduct,
     updateProduct,
     deleteProduct,
+    getProductsByPromotion,
+    getActiveCartPromotions,
 };

@@ -38,6 +38,11 @@ enum CartStatus {
   ABANDONED
 }
 
+enum ShippingMethod {
+  STANDARD
+  EXPRESS
+}
+
 enum PaymentStatus {
   PENDING
   SUCCESS
@@ -283,7 +288,7 @@ model Cart {
   items CartItem[]
 
   // ===== PRICING BREAKDOWN =====
-  subtotal Decimal @db.Decimal(10, 2)
+  subtotal Decimal @db.Decimal(10, 2) @default(0)
 
   // Coupon
   couponId       String?
@@ -292,15 +297,15 @@ model Cart {
   discountAmount Decimal? @db.Decimal(10, 2)
 
   // Tax
-  taxRate   Decimal? @db.Decimal(5, 2)
-  taxAmount Decimal? @db.Decimal(10, 2)
+  taxRate   Decimal? @db.Decimal(5, 2) @default(0)
+  taxAmount Decimal? @db.Decimal(10, 2) @default(0)
 
   // Shipping
   shippingMethod String?
   shippingAmount Decimal? @db.Decimal(10, 2)
 
   // Final
-  total Decimal @db.Decimal(10, 2)
+  total Decimal @db.Decimal(10, 2) @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -338,15 +343,21 @@ model ShippingRate {
   country String
   state   String?
 
-  method String // STANDARD | EXPRESS
-  price  Decimal @db.Decimal(10, 2)
+  method ShippingMethod
 
-  minOrder Decimal?
-  maxOrder Decimal?
+  price Decimal @db.Decimal(10,2)
+
+  minOrder Decimal? @db.Decimal(10,2)
+  maxOrder Decimal? @db.Decimal(10,2)
+
+  currency String @default("PKR")
 
   isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([country, state, method])
 }
 
 // =====================

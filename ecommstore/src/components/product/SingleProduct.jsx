@@ -20,6 +20,7 @@ import {
   Package,
   Tag,
   Layers,
+  Clock,
 } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import { usePathname } from "next/navigation";
@@ -98,7 +99,6 @@ const SingleProductPage = ({ products }) => {
       setCanReview(false);
     }
   };
-  console.log(reviews);
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
@@ -124,9 +124,7 @@ const SingleProductPage = ({ products }) => {
       }
     } catch (error) {
       console.error("Submit review error:", error);
-      toast.error(
-        error.response?.data?.error || "Failed to submit review"
-      );
+      toast.error(error.response?.data?.error || "Failed to submit review");
     } finally {
       setIsSubmittingReview(false);
     }
@@ -178,10 +176,35 @@ const SingleProductPage = ({ products }) => {
       .join(" ");
   };
 
+  // Helper function to check if promotion is active
+  const isPromotionActive = (promotion) => {
+    if (!promotion) return false;
+    const now = new Date();
+    const endsAt = new Date(promotion.endsAt);
+    return now < endsAt;
+  };
+
+  // Helper function to calculate time remaining
+  const getTimeRemaining = (endDate) => {
+    const now = new Date();
+    const end = new Date(endDate);
+    const diff = end - now;
+
+    if (diff <= 0) return null;
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days > 0) return `${days}d ${hours}h remaining`;
+    if (hours > 0) return `${hours}h ${minutes}m remaining`;
+    return `${minutes}m remaining`;
+  };
+
   // Helper function to render attributes
   const renderAttributes = (attributes) => {
     if (!attributes || Object.keys(attributes).length === 0) return null;
-    
+
     return (
       <div className="flex flex-wrap gap-2 mt-2">
         {Object.entries(attributes).map(([key, value]) => (
@@ -205,6 +228,13 @@ const SingleProductPage = ({ products }) => {
     );
   }
 
+  // Get promotion info
+  const promotion = selectedVariant?.promotion || product?.promotion;
+  const hasActivePromotion = promotion && isPromotionActive(promotion);
+  const hasDiscount =
+    selectedVariant?.discountedPrice &&
+    selectedVariant.discountedPrice < selectedVariant.price;
+
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
       {/* Product Section */}
@@ -213,8 +243,28 @@ const SingleProductPage = ({ products }) => {
           <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 bg-white border border-(--border-default) rounded-xl p-4 sm:p-6 md:p-8">
             {/* Left - Images */}
             <div className="space-y-3 sm:space-y-4">
-              {/* Main Image */}
+              {/* Main Image with Badges */}
               <div className="border border-(--border-default) rounded-xl overflow-hidden bg-(--bg-surface) aspect-square flex items-center justify-center relative">
+                {/* Badges Container - Top Left */}
+                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                  {/* Discount Badge */}
+                  {hasDiscount && promotion?.savingsPercent && (
+                    <span className="bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded shadow-lg">
+                      -{Math.round(promotion.savingsPercent)}% OFF
+                    </span>
+                  )}
+
+                  {/* Tag Badges (Sale, New, etc.) */}
+                  {product.tag?.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="bg-black text-white text-sm font-semibold px-3 py-1.5 rounded uppercase shadow-lg"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
                 <Image
                   src={
                     selectedImage
@@ -251,7 +301,7 @@ const SingleProductPage = ({ products }) => {
                       key={img}
                       onClick={() => setSelectedImage(img)}
                       className={`border-2 rounded-lg overflow-hidden aspect-square w-16 sm:w-20 md:w-24 transition-all shrink-0 relative ${
-                        selectedImage === img.url
+                        selectedImage === img
                           ? "border-(--color-brand-primary)"
                           : "border-(--border-default) hover:border-gray-500"
                       }`}
@@ -300,6 +350,32 @@ const SingleProductPage = ({ products }) => {
                 </p>
               </div>
 
+              {/* Promotion Banner */}
+              {hasActivePromotion && (
+                <div className="bg-linear-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Tag size={18} className="text-red-600" />
+                        <h3 className="font-bold text-red-600 text-lg">
+                          {promotion.name}
+                        </h3>
+                      </div>
+                      <p className="text-sm text-red-700">
+                        Save up to {Math.round(promotion.savingsPercent)}% on this
+                        product!
+                      </p>
+                    </div>
+                    {promotion.endsAt && (
+                      <div className="flex items-center gap-1 text-xs font-medium text-red-600 bg-white px-3 py-1.5 rounded-full whitespace-nowrap">
+                        <Clock size={14} />
+                        {getTimeRemaining(promotion.endsAt)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Rating */}
               <div className="flex items-center gap-4 pb-4 border-b border-(--border-default)">
                 <StarRating rating={product.averageRating || 0} size="md" />
@@ -312,71 +388,99 @@ const SingleProductPage = ({ products }) => {
                     Select Variant:
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {product.variants.map((variant) => (
-                      <button
-                        key={variant.id}
-                        onClick={() => {
-                          setSelectedVariant(variant);
-                          setQuantity(1);
-                        }}
-                        className={`p-3 border-2 rounded-lg transition-all text-left ${
-                          selectedVariant?.id === variant.id
-                            ? "border-(--color-brand-primary) bg-(--bg-surface)"
-                            : "border-(--border-default) hover:border-gray-400"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-gray-500">
-                            SKU: {variant.sku}
-                          </span>
-                          {variant.inStock ? (
-                            <span className="text-xs text-green-600 font-medium">
-                              In Stock
-                            </span>
-                          ) : (
-                            <span className="text-xs text-red-500 font-medium">
-                              Out of Stock
+                    {product.variants.map((variant) => {
+                      const variantHasDiscount =
+                        variant.discountedPrice &&
+                        variant.discountedPrice < variant.price;
+                      const variantPromotion = variant.promotion;
+
+                      return (
+                        <button
+                          key={variant.id}
+                          onClick={() => {
+                            setSelectedVariant(variant);
+                            setQuantity(1);
+                          }}
+                          className={`p-3 border-2 rounded-lg transition-all text-left relative ${
+                            selectedVariant?.id === variant.id
+                              ? "border-(--color-brand-primary) bg-(--bg-surface)"
+                              : "border-(--border-default) hover:border-gray-400"
+                          }`}
+                        >
+                          {/* Discount Badge on Variant */}
+                          {variantHasDiscount && variantPromotion?.savingsPercent && (
+                            <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                              -{Math.round(variantPromotion.savingsPercent)}%
                             </span>
                           )}
-                        </div>
-                        
-                        {/* Display Attributes */}
-                        {renderAttributes(variant.attributes)}
-                        
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                          <span className="text-sm font-bold text-(--color-brand-primary)">
-                            Rs. {variant.price}
-                          </span>
-                          <span className="text-xs text-(--text-secondary)">
-                            {variant.availableQty} available
-                          </span>
-                        </div>
-                      </button>
-                    ))}
+
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-gray-500">
+                              SKU: {variant.sku}
+                            </span>
+                            {variant.inStock ? (
+                              <span className="text-xs text-green-600 font-medium">
+                                In Stock
+                              </span>
+                            ) : (
+                              <span className="text-xs text-red-500 font-medium">
+                                Out of Stock
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Display Attributes */}
+                          {renderAttributes(variant.attributes)}
+
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                            <div className="flex items-center gap-2">
+                              {variantHasDiscount ? (
+                                <>
+                                  <span className="text-sm font-bold text-red-600">
+                                    Rs. {variant.discountedPrice.toFixed(2)}
+                                  </span>
+                                  <span className="text-xs text-gray-500 line-through">
+                                    Rs. {variant.price}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-sm font-bold text-(--color-brand-primary)">
+                                  Rs. {variant.price}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-(--text-secondary)">
+                              {variant.availableQty} available
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
               {/* Selected Variant Details */}
-              {selectedVariant && selectedVariant.attributes && (
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <h4 className="text-sm font-semibold text-(--text-heading) mb-2 flex items-center gap-2">
+              {selectedVariant && (
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h4 className="text-sm font-semibold text-(--text-heading) mb-3 flex items-center gap-2">
                     <Layers size={16} />
                     Selected Variant Details
                   </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(selectedVariant.attributes).map(([key, value]) => (
-                      <div key={key} className="flex justify-between text-sm">
-                        <span className="text-gray-600">{formatAttributeKey(key)}:</span>
-                        <span className="font-medium text-(--text-heading)">{value}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Price:</span>
-                      <span className="font-medium text-(--color-brand-primary)">
-                        Rs. {selectedVariant.price}
-                      </span>
-                    </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedVariant.attributes &&
+                      Object.entries(selectedVariant.attributes).map(
+                        ([key, value]) => (
+                          <div key={key} className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                              {formatAttributeKey(key)}:
+                            </span>
+                            <span className="font-medium text-(--text-heading)">
+                              {value}
+                            </span>
+                          </div>
+                        )
+                      )}
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">SKU:</span>
                       <span className="font-medium text-(--text-heading)">
@@ -384,17 +488,50 @@ const SingleProductPage = ({ products }) => {
                       </span>
                     </div>
                   </div>
+
+                  {/* Promotion Info for Selected Variant */}
+                  {selectedVariant.promotion &&
+                    isPromotionActive(selectedVariant.promotion) && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-green-600 font-medium">
+                            {selectedVariant.promotion.name}
+                          </span>
+                          <span className="text-green-600 font-bold">
+                            Save Rs.{" "}
+                            {selectedVariant.promotion.savingsAmount.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
 
-              {/* Price */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                <span className="text-3xl sm:text-4xl font-bold text-red-500">
-                  Rs. {selectedVariant?.price || product?.variants?.[0]?.price || "0.00"}
-                </span>
-                {selectedVariant && (
-                  <span className="text-sm text-(--text-secondary)">
-                    SKU: {selectedVariant.sku}
+              {/* Price Display */}
+              <div className="space-y-2">
+                {hasDiscount ? (
+                  <>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-3xl sm:text-4xl font-bold text-red-600">
+                        Rs. {selectedVariant?.discountedPrice?.toFixed(2)}
+                      </span>
+                      <span className="text-xl text-gray-500 line-through">
+                        Rs. {selectedVariant?.price}
+                      </span>
+                    </div>
+                    {promotion?.savingsAmount && (
+                      <p className="text-green-600 font-medium text-sm">
+                        You save: Rs. {promotion.savingsAmount.toFixed(2)} (
+                        {Math.round(promotion.savingsPercent)}%)
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-3xl sm:text-4xl font-bold text-(--color-brand-primary)">
+                    Rs.{" "}
+                    {selectedVariant?.price ||
+                      product?.variants?.[0]?.price ||
+                      "0.00"}
                   </span>
                 )}
               </div>
@@ -610,7 +747,45 @@ const SingleProductPage = ({ products }) => {
                       </span>
                     </div>
                   )}
-                  
+
+                  {/* Promotion Info */}
+                  {product?.hasPromotion && product?.promotion && (
+                    <>
+                      <div className="col-span-full mt-4 mb-2">
+                        <h4 className="font-semibold text-lg text-(--text-heading) flex items-center gap-2">
+                          <Tag size={20} className="text-red-600" />
+                          Active Promotion
+                        </h4>
+                      </div>
+                      <div className="flex justify-between items-center p-3 sm:p-4 bg-red-50 rounded-lg text-sm sm:text-base border border-red-200">
+                        <span className="font-medium text-(--text-heading)">
+                          Promotion Name
+                        </span>
+                        <span className="text-red-600 font-semibold">
+                          {product.promotion.name}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 sm:p-4 bg-red-50 rounded-lg text-sm sm:text-base border border-red-200">
+                        <span className="font-medium text-(--text-heading)">
+                          Discount
+                        </span>
+                        <span className="text-red-600 font-semibold">
+                          {product.promotion.discountValue}% OFF
+                        </span>
+                      </div>
+                      {product.promotion.endsAt && (
+                        <div className="flex justify-between items-center p-3 sm:p-4 bg-red-50 rounded-lg text-sm sm:text-base border border-red-200">
+                          <span className="font-medium text-(--text-heading)">
+                            Ends At
+                          </span>
+                          <span className="text-red-600 font-semibold">
+                            {new Date(product.promotion.endsAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   {/* Display all unique attributes from all variants */}
                   {product?.variants && product.variants.length > 0 && (
                     <>
@@ -623,22 +798,29 @@ const SingleProductPage = ({ products }) => {
                       {(() => {
                         // Collect all unique attribute keys across all variants
                         const allAttributes = new Set();
-                        product.variants.forEach(variant => {
+                        product.variants.forEach((variant) => {
                           if (variant.attributes) {
-                            Object.keys(variant.attributes).forEach(key => allAttributes.add(key));
+                            Object.keys(variant.attributes).forEach((key) =>
+                              allAttributes.add(key)
+                            );
                           }
                         });
-                        
-                        return Array.from(allAttributes).map(attrKey => {
+
+                        return Array.from(allAttributes).map((attrKey) => {
                           // Get all unique values for this attribute
-                          const values = [...new Set(
-                            product.variants
-                              .map(v => v.attributes?.[attrKey])
-                              .filter(Boolean)
-                          )];
-                          
+                          const values = [
+                            ...new Set(
+                              product.variants
+                                .map((v) => v.attributes?.[attrKey])
+                                .filter(Boolean)
+                            ),
+                          ];
+
                           return (
-                            <div key={attrKey} className="flex justify-between items-center p-3 sm:p-4 bg-(--bg-surface) rounded-lg text-sm sm:text-base">
+                            <div
+                              key={attrKey}
+                              className="flex justify-between items-center p-3 sm:p-4 bg-(--bg-surface) rounded-lg text-sm sm:text-base"
+                            >
                               <span className="font-medium text-(--text-heading)">
                                 {formatAttributeKey(attrKey)}
                               </span>
@@ -740,10 +922,14 @@ const SingleProductPage = ({ products }) => {
                       <div className="flex gap-2">
                         <button
                           type="submit"
-                          disabled={isSubmittingReview || reviewFormData.rating === 0}
+                          disabled={
+                            isSubmittingReview || reviewFormData.rating === 0
+                          }
                           className="bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium disabled:opacity-50"
                         >
-                          {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                          {isSubmittingReview
+                            ? "Submitting..."
+                            : "Submit Review"}
                         </button>
                         <button
                           type="button"
@@ -780,7 +966,10 @@ const SingleProductPage = ({ products }) => {
                       >
                         <div className="flex items-start gap-4">
                           <div className="w-10 h-10 bg-(--bg-surface) rounded-full flex items-center justify-center shrink-0">
-                            <User size={20} className="text-(--text-secondary)" />
+                            <User
+                              size={20}
+                              className="text-(--text-secondary)"
+                            />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-2">
@@ -789,12 +978,19 @@ const SingleProductPage = ({ products }) => {
                                   {review.user?.name || "Anonymous"}
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
-                                  {<StarRating rating={review.rating} size="sm" />}
+                                  {
+                                    <StarRating
+                                      rating={review.rating}
+                                      size="sm"
+                                    />
+                                  }
                                   <span className="text-xs text-(--text-secondary)">
                                     •
                                   </span>
                                   <span className="text-xs text-(--text-secondary)">
-                                    {new Date(review.createdAt).toLocaleDateString()}
+                                    {new Date(
+                                      review.createdAt
+                                    ).toLocaleDateString()}
                                   </span>
                                 </div>
                               </div>

@@ -74,7 +74,7 @@ export const columns = [
     header: "Order Date",
   },
   {
-    key: "totalAmount",
+    key: "total",
     header: "Order Amount",
   },
   {

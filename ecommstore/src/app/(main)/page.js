@@ -20,7 +20,7 @@ export default async function Home() {
         <Categories categories={categories} />
         <HomeSectionAbout />
         <Catalog products={products} categories={categories} />
-        <LimitedTimeOffer />
+        <LimitedTimeOffer products={products} />
         <PartnersSlider />
       </PageTransition>
     </>

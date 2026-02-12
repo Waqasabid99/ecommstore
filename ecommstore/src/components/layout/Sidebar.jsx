@@ -21,7 +21,8 @@ import {
   Star,
   RefreshCcw,
   CircleDollarSign,
-  TrendingUp
+  TrendingUp,
+  Truck
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -91,6 +92,11 @@ const Sidebar = () => {
     subItems: [
       { name: 'Statistics', href: `/admin/${adminID}/returns/stats`, icon: <Plus className="w-4 h-4" /> },
     ]
+  },
+  {
+    name: 'Shipping',
+    href: `/admin/${adminID}/shipping`,
+    icon: <Truck className="w-5 h-5" />,
   },
   {
     name: 'Refunds',

@@ -365,13 +365,13 @@ const ViewOrder = () => {
                   <div className="flex justify-between text-sm text-(--text-secondary)">
                     <span>Shipping</span>
                     <span className="font-medium">
-                      Rs. {shipping.toLocaleString()}
+                      Rs. {order.shippingAmount}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm text-(--text-secondary)">
-                    <span>Tax (17%)</span>
+                    <span>Tax ({order.taxRate})</span>
                     <span className="font-medium">
-                      Rs. {Math.round(tax).toLocaleString()}
+                      Rs. {order.taxAmount}
                     </span>
                   </div>
                   <div className="border-t border-(--border-default) pt-3">
@@ -380,7 +380,7 @@ const ViewOrder = () => {
                         Total
                       </span>
                       <span className="font-bold text-(--text-heading) text-xl">
-                        Rs. {Math.round(total).toLocaleString()}
+                        Rs. {order.total}
                       </span>
                     </div>
                   </div>

@@ -271,6 +271,10 @@ const CreatePromotion = () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split("T")[0];
   };
+  
+  const AllCategories = categories.map((category) => category)
+  const ChildCategories = categories.map((c) => c.children.map((child) => child))
+  const filteredCategories = [...AllCategories, ...ChildCategories].flat()
 
   // Selection Modal Component
   const SelectionModal = () => {
@@ -289,7 +293,7 @@ const CreatePromotion = () => {
               v.productName.toLowerCase().includes(localSearch.toLowerCase())
           );
         case "CATEGORY":
-          return categories.filter((c) =>
+          return filteredCategories.filter((c) =>
             c.name.toLowerCase().includes(localSearch.toLowerCase())
           );
         default:

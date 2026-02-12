@@ -216,7 +216,7 @@ const getMyReturnRequests = async (req, res) => {
                         select: {
                             id: true,
                             status: true,
-                            totalAmount: true,
+                            total: true,
                             items: {
                                 include: {
                                     variant: {
@@ -254,7 +254,7 @@ const getMyReturnRequests = async (req, res) => {
             order: {
                 id: ret.order.id,
                 status: ret.order.status,
-                totalAmount: ret.order.totalAmount,
+                totalAmount: ret.order.total,
                 items: ret.order.items.map((item) => ({
                     id: item.id,
                     productName: item.variant.product.name,
@@ -403,7 +403,7 @@ const getMyRefunds = async (req, res) => {
                     order: {
                         select: {
                             id: true,
-                            totalAmount: true,
+                            total: true,
                         },
                     },
                     payment: {
@@ -428,7 +428,7 @@ const getMyRefunds = async (req, res) => {
             createdAt: refund.createdAt,
             order: {
                 id: refund.order.id,
-                totalAmount: refund.order.totalAmount,
+                totalAmount: refund.order.total,
             },
             payment: {
                 provider: refund.payment.provider,
@@ -504,7 +504,7 @@ const getAllReturnRequests = async (req, res) => {
                         select: {
                             id: true,
                             status: true,
-                            totalAmount: true,
+                            total: true,
                             items: {
                                 include: {
                                     variant: {
@@ -558,7 +558,7 @@ const getAllReturnRequests = async (req, res) => {
             order: {
                 id: ret.order.id,
                 status: ret.order.status,
-                totalAmount: ret.order.totalAmount,
+                totalAmount: ret.order.total,
                 items: ret.order.items.map((item) => ({
                     id: item.id,
                     productName: item.variant.product.name,
@@ -678,7 +678,7 @@ const updateReturnStatus = async (req, res) => {
                         data: {
                             orderId: returnRequest.orderId,
                             paymentId: returnRequest.order.payment.id,
-                            amount: returnRequest.order.totalAmount,
+                            amount: returnRequest.order.total,
                             reason: `Return approved and items received. ${adminNotes || ""}`,
                             status: "PENDING",
                         },
@@ -788,7 +788,7 @@ const getAllRefunds = async (req, res) => {
                     order: {
                         select: {
                             id: true,
-                            totalAmount: true,
+                            total: true,
                             user: {
                                 select: {
                                     id: true,
@@ -835,7 +835,7 @@ const getAllRefunds = async (req, res) => {
             createdAt: refund.createdAt,
             order: {
                 id: refund.order.id,
-                totalAmount: refund.order.totalAmount,
+                totalAmount: refund.order.total,
                 user: {
                     id: refund.order.user.id,
                     name: refund.order.user.userName,
@@ -1065,7 +1065,7 @@ const createManualRefund = async (req, res) => {
             }
 
             // 2. Check if refund amount exceeds order total
-            if (refundAmount.greaterThan(order.totalAmount)) {
+            if (refundAmount.greaterThan(order.total)) {
                 throw new Error("AMOUNT_EXCEEDS_TOTAL");
             }
 
@@ -1076,7 +1076,7 @@ const createManualRefund = async (req, res) => {
             });
 
             const totalRefunded = new Decimal(existingRefunds._sum.amount || 0);
-            if (totalRefunded.plus(refundAmount).greaterThan(order.totalAmount)) {
+            if (totalRefunded.plus(refundAmount).greaterThan(order.total)) {
                 throw new Error("TOTAL_REFUNDS_EXCEED_ORDER");
             }
 

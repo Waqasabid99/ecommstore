@@ -11,6 +11,7 @@ import StarRating from "../ui/StarRating";
 const ProductCard = ({ product }) => {
   const { addToCart } = useCartStore();
   const [isLoading, setIsLoading] = useState(false);
+
   const handleAddToCart = async () => {
     if (isLoading) return;
 
@@ -34,16 +35,43 @@ const ProductCard = ({ product }) => {
       setIsLoading(false);
     }
   };
-  console.log(product)
+
   // Get thumbnail from new data structure
   const mainImage =
     product.thumbnail || product.images?.[0] || "/placeholder.png";
 
   // Get price from first variant
-  const displayPrice = product.variants?.[0]?.price || "0";
+  const firstVariant = product.variants?.[0];
+  const displayPrice = firstVariant?.price || "0";
+  const discountedPrice = firstVariant?.discountedPrice;
+  const hasDiscount = discountedPrice && discountedPrice < displayPrice;
+
+  // Get promotion info
+  const promotion = product.promotion || firstVariant?.promotion;
+  const savingsPercent = promotion?.savingsPercent || firstVariant?.promotion?.savingsPercent;
 
   return (
     <div className="group relative border border-(--border-default) overflow-hidden flex flex-col">
+      {/* Badges Container - Top Left */}
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+        {/* Discount Badge */}
+        {hasDiscount && savingsPercent && (
+          <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+            -{Math.round(savingsPercent)}%
+          </span>
+        )}
+
+        {/* Tag Badges (Sale, New, etc.) */}
+        {product.tag?.map((tag, index) => (
+          <span
+            key={index}
+            className="bg-black text-white text-xs font-semibold px-2 py-1 rounded uppercase"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
       {/* Top */}
       <div className="flex justify-between items-center px-4 pt-4">
         <Link href={`/shop/products/${product.slug}`}>
@@ -104,12 +132,33 @@ const ProductCard = ({ product }) => {
               : product.name}
           </h3>
 
-          {/* Rating (temporary static or optional) */}
+          {/* Rating */}
           <StarRating rating={product.averageRating || 0} size="sm" />
 
-          <h4 className="text-sm font-medium hover:text-(--text-hover)">
-            Rs. {Number(displayPrice).toLocaleString()}
-          </h4>
+          {/* Price Display */}
+          <div className="flex items-center gap-2">
+            {hasDiscount ? (
+              <>
+                <h4 className="text-sm font-bold text-red-600 hover:text-(--text-hover)">
+                  Rs. {Number(discountedPrice).toLocaleString()}
+                </h4>
+                <span className="text-xs text-gray-500 line-through">
+                  Rs. {Number(displayPrice).toLocaleString()}
+                </span>
+              </>
+            ) : (
+              <h4 className="text-sm font-medium hover:text-(--text-hover)">
+                Rs. {Number(displayPrice).toLocaleString()}
+              </h4>
+            )}
+          </div>
+
+          {/* Promotion Name (Optional) */}
+          {promotion && (
+            <p className="text-xs text-green-600 font-medium mt-1">
+              {promotion.name}
+            </p>
+          )}
         </Link>
 
         {/* Mobile Add to Cart */}

@@ -70,8 +70,7 @@ const ViewOrder = () => {
     }
   };
 
-
-  console.log(order);
+  console.log(10);
 
   const handleUpdateStatus = async () => {
     if (!selectedStatus) {

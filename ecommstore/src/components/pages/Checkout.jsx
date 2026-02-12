@@ -5,13 +5,13 @@ import {
   Truck,
   User,
   Mail,
-  Lock,
-  CheckCircle,
-  ArrowLeft,
   Key,
   Eye,
   EyeOff,
+  CheckCircle,
+  ArrowLeft,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import { Country, State, City } from "country-state-city";
@@ -40,17 +40,17 @@ const Checkout = () => {
   const [billingAddressId, setBillingAddressId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [orderId, setOrderId] = useState(null);
+  const [shippingMethods, setShippingMethods] = useState([]);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState("STANDARD");
+  const [loadingShipping, setLoadingShipping] = useState(false);
+  const [orderDetails, setOrderDetails] = useState(null);
+
   const { getCartItems, getCartSummary, initializeCart } = useCartStore();
   const { isAuthenticated, user } = useAuth();
   const { login, register, error: storeError, clearError } = useAuthStore();
 
-  const { subtotal } = getCartSummary();
+  const { subtotal, discountAmount, promotionSavings, taxAmount, total } = getCartSummary();
   const orderItems = getCartItems();
-
-  const [discount, setDiscount] = useState(0);
-  const [shipping, setShipping] = useState(0);
-  const [tax, setTax] = useState(0);
-  const [total, setTotal] = useState(subtotal);
 
   const countryOptions = Country.getAllCountries().map((country) => ({
     value: country.isoCode,
@@ -82,45 +82,6 @@ const Checkout = () => {
     postalCode: "",
   });
 
-  const [shippingAddress, setShippingAddress] = useState({
-    fullName: "",
-    phone: "",
-    line1: "",
-    line2: "",
-    country: "",
-    state: "",
-    city: "",
-    postalCode: "",
-    isDefault: sameAsShipping,
-  });
-
-  const [LoginformData, setLoginFormData] = useState({
-    email: "",
-    password: "",
-  });
-
-  useEffect(() => {
-    setShippingAddress({
-      fullName: shippingInfo.fullName,
-      phone: shippingInfo.phone,
-      line1: shippingInfo.line1,
-      line2: shippingInfo.line2,
-      country: shippingInfo.country,
-      state: shippingInfo.state,
-      city: shippingInfo.city,
-      postalCode: shippingInfo.postalCode,
-      isDefault: sameAsShipping,
-    });
-  }, [shippingInfo]);
-    console.log(shippingAddress);
-
-  useEffect(() => {
-    setLoginFormData({
-      email: shippingInfo.email,
-      password: shippingInfo.password,
-    });
-  }, [shippingInfo.email, shippingInfo.password]);
-
   const [billingInfo, setBillingInfo] = useState({
     fullName: "",
     phone: "",
@@ -136,6 +97,11 @@ const Checkout = () => {
     cvv: "",
   });
 
+  const [LoginformData, setLoginFormData] = useState({
+    email: "",
+    password: "",
+  });
+
   // Auto-fill user data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -143,18 +109,27 @@ const Checkout = () => {
         ...prev,
         firstName: user.username?.split(" ")[0] || "",
         lastName: user.username?.split(" ").slice(1).join(" ") || "",
+        fullName: user.username || "",
         email: user.email || "",
       }));
     }
   }, [isAuthenticated, user]);
 
-  // Clear auth errors when component unmounts or when switching between login/register
+  // Clear auth errors
   useEffect(() => {
     return () => {
       clearError();
       setAuthError("");
     };
-  }, [hasAccount]);
+  }, [hasAccount, clearError]);
+
+  // Update login form data
+  useEffect(() => {
+    setLoginFormData({
+      email: shippingInfo.email,
+      password: shippingInfo.password,
+    });
+  }, [shippingInfo.email, shippingInfo.password]);
 
   const handleShippingChange = (e) => {
     const { name, value } = e.target;
@@ -176,12 +151,10 @@ const Checkout = () => {
       let result;
 
       if (hasAccount) {
-        // Login
         result = await login(LoginformData);
       } else {
-        // Register
         result = await register({
-          name: shippingInfo.firstName,
+          name: shippingInfo.firstName + " " + shippingInfo.lastName,
           email: shippingInfo.email,
           password: shippingInfo.password,
         });
@@ -189,17 +162,44 @@ const Checkout = () => {
 
       if (result?.success) {
         setAuthError("");
-        // Form will auto-fill with user data via useEffect
       } else {
         setAuthError(
           storeError ||
-            `${hasAccount ? "Login" : "Registration"} failed. ${result.error.message} `,
+            result?.error?.message ||
+            `${hasAccount ? "Login" : "Registration"} failed.`
         );
       }
     } catch (error) {
       setAuthError("An unexpected error occurred. Please try again.");
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  // Fetch available shipping methods when address is complete
+  const fetchShippingMethods = async (addressId) => {
+    if (!addressId) return;
+
+    setLoadingShipping(true);
+    try {
+      const { data } = await axios.post(
+        `${baseUrl}/checkout/shipping-methods`,
+        { shippingAddressId: addressId },
+        { withCredentials: true }
+      );
+
+      if (data.success) {
+        setShippingMethods(data.data);
+        // Set default shipping method if available
+        if (data.data.length > 0) {
+          setSelectedShippingMethod(data.data[0].method);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching shipping methods:", error);
+      setAuthError(error.response?.data?.error || "Failed to load shipping methods");
+    } finally {
+      setLoadingShipping(false);
     }
   };
 
@@ -213,6 +213,7 @@ const Checkout = () => {
     }
 
     if (
+      !shippingInfo.fullName ||
       !shippingInfo.phone ||
       !shippingInfo.line1 ||
       !shippingInfo.city ||
@@ -222,8 +223,10 @@ const Checkout = () => {
       setAuthError("Please fill in all required shipping details");
       return;
     }
+
     if (!sameAsShipping) {
       if (
+        !billingInfo.fullName ||
         !billingInfo.line1 ||
         !billingInfo.city ||
         !billingInfo.phone ||
@@ -237,43 +240,74 @@ const Checkout = () => {
 
     try {
       setIsLoading(true);
-      if (sameAsShipping) {
-        const { data } = await axios.post(
-          `${baseUrl}/address/create`,
-          shippingAddress,
-          { withCredentials: true },
-        );
-          if (data.success) {
-            setIsLoading(false);
-            setShippingAddressId(data.data.id);
-            setAuthError("");
-            setStep(2);
-            window.scrollTo(0, 0);
-          } else {
-            setIsLoading(false);
-            setAuthError(data.error.message);
-          }
-      } else {
-        const { data } = await axios.post(
-          `${baseUrl}/address/create`,
-          billingInfo,
-          { withCredentials: true },
-        );
-        if (data.success) {
-          setIsLoading(false);
-          setShippingAddressId(data.data.id);
-          setBillingAddressId(data.data.id);
-          setAuthError("");
-          setStep(2);
-          window.scrollTo(0, 0);
-        } else {
-          setIsLoading(false);
-          setAuthError(data.error.message);
-        }
+
+      // Create shipping address
+      const shippingAddressData = {
+        fullName: shippingInfo.fullName,
+        phone: shippingInfo.phone,
+        line1: shippingInfo.line1,
+        line2: shippingInfo.line2 || null,
+        city: shippingInfo.city,
+        state: shippingInfo.state,
+        country: shippingInfo.country,
+        postalCode: shippingInfo.postalCode || null,
+        isDefault: sameAsShipping,
+      };
+
+      const { data: shippingData } = await axios.post(
+        `${baseUrl}/address/create`,
+        shippingAddressData,
+        { withCredentials: true }
+      );
+
+      if (!shippingData.success) {
+        setAuthError(shippingData.error || "Failed to save shipping address");
+        setIsLoading(false);
+        return;
       }
+
+      setShippingAddressId(shippingData.data.id);
+
+      // Fetch available shipping methods
+      await fetchShippingMethods(shippingData.data.id);
+
+      // Create billing address if different
+      if (!sameAsShipping) {
+        const billingAddressData = {
+          fullName: billingInfo.fullName,
+          phone: billingInfo.phone,
+          line1: billingInfo.line1,
+          line2: billingInfo.line2 || null,
+          city: billingInfo.city,
+          state: billingInfo.state,
+          country: billingInfo.country,
+          postalCode: billingInfo.postalCode || null,
+          isDefault: false,
+        };
+
+        const { data: billingData } = await axios.post(
+          `${baseUrl}/address/create`,
+          billingAddressData,
+          { withCredentials: true }
+        );
+
+        if (!billingData.success) {
+          setAuthError(billingData.error || "Failed to save billing address");
+          setIsLoading(false);
+          return;
+        }
+
+        setBillingAddressId(billingData.data.id);
+      }
+
+      setAuthError("");
+      setStep(2);
+      window.scrollTo(0, 0);
     } catch (error) {
+      console.error("Address creation error:", error);
+      setAuthError(error.response?.data?.error || "Failed to save address");
+    } finally {
       setIsLoading(false);
-      setAuthError(error.message);
     }
   };
 
@@ -281,23 +315,46 @@ const Checkout = () => {
     e.preventDefault();
     setAuthError("");
     setIsLoading(true);
+
     try {
-      const { data } = await axios.post(`${baseUrl}/checkout`, { shippingAddressId, sameAsShipping }, { withCredentials: true});
-      console.log(data);
+      const checkoutData = {
+        shippingAddressId,
+        billingAddressId: sameAsShipping ? null : billingAddressId,
+        useSameAddress: sameAsShipping,
+        shippingMethod: selectedShippingMethod,
+      };
+
+      const { data } = await axios.post(
+        `${baseUrl}/checkout`,
+        checkoutData,
+        { withCredentials: true }
+      );
+
       if (data.success) {
-        setIsLoading(false);
         setOrderId(data.data.orderId);
+        setOrderDetails(data.data);
         setStep(3);
         window.scrollTo(0, 0);
-        initializeCart();
+        // Clear cart after successful order
+        await initializeCart();
       } else {
-        setIsLoading(false);
-        setAuthError(data.error.message);
+        setAuthError(data.error || "Failed to place order");
       }
     } catch (error) {
+      console.error("Checkout error:", error);
+      const errorData = error.response?.data;
+      
+      // Handle inventory errors specially
+      if (errorData?.details && Array.isArray(errorData.details)) {
+        const inventoryMessages = errorData.details.map(issue => 
+          `${issue.name || 'Item'}: ${issue.issue}`
+        ).join('\n');
+        setAuthError(`Inventory issues:\n${inventoryMessages}`);
+      } else {
+        setAuthError(errorData?.error || "Failed to place order. Please try again.");
+      }
+    } finally {
       setIsLoading(false);
-      setAuthError(error.message);
-      console.log(error);
     }
   };
 
@@ -323,7 +380,7 @@ const Checkout = () => {
               <p className="text-(--text-secondary) mb-8">
                 Order #
                 <span className="font-semibold text-(--text-heading)">
-                  ORD-{ orderId.substr(0, 8).toUpperCase() }
+                  {orderId?.substr(0, 8).toUpperCase()}
                 </span>
               </p>
 
@@ -333,27 +390,51 @@ const Checkout = () => {
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-(--text-secondary)">
-                      Total Amount:
-                    </span>
+                    <span className="text-(--text-secondary)">Subtotal:</span>
                     <span className="font-semibold">
-                      Rs. {Math.round(total).toLocaleString()}
+                      Rs. {parseFloat(orderDetails?.subtotal || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  {orderDetails?.promotionSavings > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Promotion Savings:</span>
+                      <span className="font-semibold">
+                        -Rs. {parseFloat(orderDetails.promotionSavings).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {orderDetails?.discountAmount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Coupon Discount:</span>
+                      <span className="font-semibold">
+                        -Rs. {parseFloat(orderDetails.discountAmount).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-(--text-secondary)">Shipping:</span>
+                    <span className="font-semibold">
+                      Rs. {parseFloat(orderDetails?.shippingAmount || 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-(--text-secondary)">
-                      Payment Method:
-                    </span>
+                    <span className="text-(--text-secondary)">Tax:</span>
                     <span className="font-semibold">
-                      {paymentMethod === "cod"
-                        ? "Cash on Delivery"
-                        : "Card Payment"}
+                      Rs. {parseFloat(orderDetails?.taxAmount || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between font-bold">
+                    <span>Total:</span>
+                    <span>Rs. {parseFloat(orderDetails?.total || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between mt-4 pt-4 border-t">
+                    <span className="text-(--text-secondary)">Payment Method:</span>
+                    <span className="font-semibold">
+                      {paymentMethod === "cod" ? "Cash on Delivery" : "Card Payment"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-(--text-secondary)">
-                      Delivery to:
-                    </span>
+                    <span className="text-(--text-secondary)">Delivery to:</span>
                     <span className="font-semibold">{shippingInfo.city}</span>
                   </div>
                 </div>
@@ -369,18 +450,24 @@ const Checkout = () => {
                 <p className="text-sm text-(--text-secondary)">
                   Estimated delivery:{" "}
                   <span className="font-semibold text-(--text-heading)">
-                    3-5 business days
+                    {selectedShippingMethod === "EXPRESS" ? "1-2" : "3-5"} business days
                   </span>
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-                <button className="bg-(--btn-bg-primary) text-(--btn-text-primary) px-8 py-3 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium">
-                  Track Order
-                </button>
-                <button className="border-2 border-(--border-inverse) text-(--text-primary) px-8 py-3 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium">
+                <Link
+                  href={`/user/${user.id}/orders/${orderId}`}
+                  className="bg-(--btn-bg-primary) text-(--btn-text-primary) px-8 py-3 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-center"
+                >
+                  View Order
+                </Link>
+                <Link
+                  href="/shop"
+                  className="border-2 border-(--border-inverse) text-(--text-primary) px-8 py-3 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium text-center"
+                >
                   Continue Shopping
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -395,7 +482,7 @@ const Checkout = () => {
       <section className="bg-linear-to-br from-blue-50 to-purple-50 mx-4 rounded-xl px-6 py-12 md:py-16 mb-6">
         <div className="max-w-7xl mx-auto">
           <Link
-            href={"/cart"}
+            href="/cart"
             className="text-(--text-secondary) hover:text-(--text-hover) font-medium flex items-center gap-2 mb-4"
           >
             <ArrowLeft size={18} />
@@ -426,7 +513,9 @@ const Checkout = () => {
                 1
               </div>
               <span
-                className={`hidden sm:inline font-medium ${step >= 1 ? "text-(--text-heading)" : "text-(--text-secondary)"}`}
+                className={`hidden sm:inline font-medium ${
+                  step >= 1 ? "text-(--text-heading)" : "text-(--text-secondary)"
+                }`}
               >
                 Shipping
               </span>
@@ -445,7 +534,9 @@ const Checkout = () => {
                 2
               </div>
               <span
-                className={`hidden sm:inline font-medium ${step >= 2 ? "text-(--text-heading)" : "text-(--text-secondary)"}`}
+                className={`hidden sm:inline font-medium ${
+                  step >= 2 ? "text-(--text-heading)" : "text-(--text-secondary)"
+                }`}
               >
                 Payment
               </span>
@@ -464,7 +555,9 @@ const Checkout = () => {
                 3
               </div>
               <span
-                className={`hidden sm:inline font-medium ${step >= 3 ? "text-(--text-heading)" : "text-(--text-secondary)"}`}
+                className={`hidden sm:inline font-medium ${
+                  step >= 3 ? "text-(--text-heading)" : "text-(--text-secondary)"
+                }`}
               >
                 Confirm
               </span>
@@ -503,7 +596,7 @@ const Checkout = () => {
                         size={20}
                         className="text-red-600 mt-0.5 shrink-0"
                       />
-                      <p className="text-sm text-red-800">
+                      <p className="text-sm text-red-800 whitespace-pre-line">
                         {authError || storeError}
                       </p>
                     </div>
@@ -517,16 +610,13 @@ const Checkout = () => {
                         className="text-green-600 mt-0.5 shrink-0"
                       />
                       <p className="text-sm text-green-800">
-                        Welcome back, {user?.username || user?.email}! Your
-                        account details have been loaded.
+                        Welcome back, {user?.username || user?.email}!
                       </p>
                     </div>
                   )}
 
                   <form
-                    onSubmit={
-                      isAuthenticated ? handleContinueToPayment : handleAuth
-                    }
+                    onSubmit={isAuthenticated ? handleContinueToPayment : handleAuth}
                     className="space-y-4"
                   >
                     {/* Name Fields - Only show if not logged in and not in login mode */}
@@ -609,11 +699,19 @@ const Checkout = () => {
                               size={18}
                               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)"
                             />
-                              {showPassword ? (
-                                <EyeOff onClick={() => setShowPassword(false)} size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-(--text-secondary)"/>
-                              ) : (
-                                <Eye onClick={() => setShowPassword(true)} size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-(--text-secondary)"/>
-                              )}
+                            {showPassword ? (
+                              <EyeOff
+                                onClick={() => setShowPassword(false)}
+                                size={18}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-(--text-secondary)"
+                              />
+                            ) : (
+                              <Eye
+                                onClick={() => setShowPassword(true)}
+                                size={18}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-(--text-secondary)"
+                              />
+                            )}
                             <input
                               type={showPassword ? "text" : "password"}
                               name="password"
@@ -629,7 +727,7 @@ const Checkout = () => {
                       </div>
                     )}
 
-                    {/* Toggle between login/register - Only show if not authenticated */}
+                    {/* Toggle between login/register */}
                     {!isAuthenticated && (
                       <div className="flex items-center justify-between">
                         <button
@@ -648,7 +746,7 @@ const Checkout = () => {
                       </div>
                     )}
 
-                    {/* Login/Register Button - Only show if not authenticated */}
+                    {/* Login/Register Button */}
                     {!isAuthenticated && (
                       <button
                         type="submit"
@@ -657,11 +755,9 @@ const Checkout = () => {
                       >
                         {authLoading ? (
                           <>
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <Loader2 size={20} className="animate-spin" />
                             <span>
-                              {hasAccount
-                                ? "Logging in..."
-                                : "Creating account..."}
+                              {hasAccount ? "Logging in..." : "Creating account..."}
                             </span>
                           </>
                         ) : (
@@ -675,164 +771,164 @@ const Checkout = () => {
                     {/* Shipping Details - Show after authentication */}
                     {isAuthenticated && (
                       <>
-                        <h3 className="text-lg font-semibold mb-4 text-(--text-heading)">
+                        <h3 className="text-lg font-semibold mb-4 text-(--text-heading) pt-4 border-t">
                           Shipping Details
                         </h3>
-                        {/* Phone */}
+
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Full Name*
+                              Full Name *
                             </label>
-                            <div className="relative">
-                              <input
-                                name="fullName"
-                                value={shippingInfo.fullName}
-                                onChange={handleShippingChange}
-                                required
-                                className="w-full px-3 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors resize-none"
-                                placeholder="Jon Doe"
-                              />
-                            </div>
+                            <input
+                              name="fullName"
+                              value={shippingInfo.fullName}
+                              onChange={handleShippingChange}
+                              required
+                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                              placeholder="John Doe"
+                            />
                           </div>
+
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
                               Phone Number *
                             </label>
-                            <div className="relative">
-                              <PhoneInput
-                                containerStyle={{ width: "100%" }}
-                                inputStyle={{ width: "100%" }}
-                                country={"us"}
-                                name="phone"
-                                value={shippingInfo.phone}
-                                onChange={(phone) =>
-                                  handleShippingChange({
-                                    target: { name: "phone", value: phone },
-                                  })
-                                }
-                                required
-                              />
-                            </div>
+                            <PhoneInput
+                              containerStyle={{ width: "100%" }}
+                              inputStyle={{
+                                width: "100%",
+                                height: "48px",
+                                fontSize: "16px",
+                              }}
+                              country="us"
+                              value={shippingInfo.phone}
+                              onChange={(phone) =>
+                                handleShippingChange({
+                                  target: { name: "phone", value: phone },
+                                })
+                              }
+                              required
+                            />
                           </div>
                         </div>
 
-                        {/* Address */}
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Address line 1*
+                              Address Line 1 *
                             </label>
-                            <div className="relative">
-                              <input
-                                name="line1"
-                                value={shippingInfo.line1}
-                                onChange={handleShippingChange}
-                                required
-                                className="w-full px-3 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors resize-none"
-                                placeholder="House/Flat No., Street Name, Area"
-                              />
-                            </div>
+                            <input
+                              name="line1"
+                              value={shippingInfo.line1}
+                              onChange={handleShippingChange}
+                              required
+                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                              placeholder="123 Main Street"
+                            />
                           </div>
+
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Address line 2
+                              Address Line 2
                             </label>
-                            <div className="relative">
-                              <input
-                                name="line2"
-                                value={shippingInfo.line2}
-                                onChange={handleShippingChange}
-                                className="w-full px-3 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors resize-none"
-                                placeholder="House/Flat No., Street Name, Area"
-                              />
-                            </div>
+                            <input
+                              name="line2"
+                              value={shippingInfo.line2}
+                              onChange={handleShippingChange}
+                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                              placeholder="Apartment, suite, etc."
+                            />
                           </div>
                         </div>
 
-                        {/* City & State */}
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
                               Country *
                             </label>
-                            <div className="relative">
-                              <Select
-                                name="country"
-                                isClearable={true}
-                                isSearchable={true}
-                                options={countryOptions}
-                                onChange={(option) => {
-                                  setShippingInfo((prev) => ({
-                                    ...prev,
-                                    country: option?.value || "",
-                                  }));
-                                  setStateOptions(
-                                    State.getStatesOfCountry(
-                                      option?.value || "",
-                                    ),
-                                  );
-                                  setCityOptions(
-                                    City.getCitiesOfCountry(
-                                      option?.value || "",
-                                    ),
-                                  );
-                                }}
-                                required
-                                className="basic-single"
-                                classNamePrefix="select"
-                                placeholder="Select Country"
-                              />
-                            </div>
+                            <Select
+                              isClearable
+                              isSearchable
+                              options={countryOptions}
+                              value={countryOptions.find(
+                                (opt) => opt.value === shippingInfo.country
+                              )}
+                              onChange={(option) => {
+                                setShippingInfo((prev) => ({
+                                  ...prev,
+                                  country: option?.value || "",
+                                  state: "",
+                                  city: "",
+                                }));
+                                setStateOptions(
+                                  State.getStatesOfCountry(option?.value || "")
+                                );
+                                setCityOptions([]);
+                              }}
+                              placeholder="Select Country"
+                              className="react-select-container"
+                              classNamePrefix="react-select"
+                            />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
                               State / Province *
                             </label>
-                            <div className="relative">
-                              <Select
-                                name="state"
-                                isClearable={true}
-                                isSearchable={true}
-                                options={states}
-                                onChange={(option) =>
-                                  setShippingInfo((prev) => ({
-                                    ...prev,
-                                    state: option?.value,
-                                  }))
+                            <Select
+                              isClearable
+                              isSearchable
+                              options={states}
+                              value={states.find(
+                                (opt) => opt.value === shippingInfo.state
+                              )}
+                              onChange={(option) => {
+                                setShippingInfo((prev) => ({
+                                  ...prev,
+                                  state: option?.value || "",
+                                  city: "",
+                                }));
+                                if (option?.value) {
+                                  setCityOptions(
+                                    City.getCitiesOfState(
+                                      shippingInfo.country,
+                                      option.value
+                                    )
+                                  );
                                 }
-                                required
-                                className="basic-single"
-                                placeholder="Select State"
-                              />
-                            </div>
+                              }}
+                              placeholder="Select State"
+                              className="react-select-container"
+                              classNamePrefix="react-select"
+                              isDisabled={!shippingInfo.country}
+                            />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
                               City *
                             </label>
-                            <div className="relative">
-                              <Select
-                                name="city"
-                                isClearable={true}
-                                isSearchable={true}
-                                options={cities}
-                                onChange={(option) =>
-                                  setShippingInfo((prev) => ({
-                                    ...prev,
-                                    city: option?.value,
-                                  }))
-                                }
-                                required
-                                className="basic-single"
-                                placeholder="Select City"
-                              />
-                            </div>
+                            <Select
+                              isClearable
+                              isSearchable
+                              options={cities}
+                              value={cities.find(
+                                (opt) => opt.value === shippingInfo.city
+                              )}
+                              onChange={(option) =>
+                                setShippingInfo((prev) => ({
+                                  ...prev,
+                                  city: option?.value || "",
+                                }))
+                              }
+                              placeholder="Select City"
+                              className="react-select-container"
+                              classNamePrefix="react-select"
+                              isDisabled={!shippingInfo.state}
+                            />
                           </div>
 
-                          {/* Postal Code */}
                           <div>
                             <label className="block text-sm font-medium text-(--text-heading) mb-2">
                               Postal Code
@@ -842,171 +938,203 @@ const Checkout = () => {
                               name="postalCode"
                               value={shippingInfo.postalCode}
                               onChange={handleShippingChange}
-                              className="w-full px-4 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                              placeholder="54000"
+                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                              placeholder="12345"
                             />
                           </div>
                         </div>
+
+                        {/* Billing Address Toggle */}
+                        <div className="flex items-center gap-2 pt-4">
+                          <input
+                            type="checkbox"
+                            id="sameAsShipping"
+                            checked={sameAsShipping}
+                            onChange={(e) => setSameAsShipping(e.target.checked)}
+                            className="w-4 h-4 text-(--color-brand-primary) border-gray-300 rounded focus:ring-(--color-brand-primary)"
+                          />
+                          <label
+                            htmlFor="sameAsShipping"
+                            className="text-sm font-medium text-(--text-heading) cursor-pointer"
+                          >
+                            Billing address is same as shipping
+                          </label>
+                        </div>
+
+                        {/* Billing Details - Show if different from shipping */}
                         {!sameAsShipping && (
                           <>
-                            <h3 className="text-lg font-semibold mb-4 text-(--text-heading)">
+                            <h3 className="text-lg font-semibold mb-4 text-(--text-heading) pt-4 border-t">
                               Billing Details
                             </h3>
-                            {/* Phone */}
+
                             <div className="grid md:grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Full Name*
+                                  Full Name *
                                 </label>
-                                <div className="relative">
-                                  <input
-                                    name="fullName"
-                                    value={billingInfo.fullName}
-                                    onChange={handleBillingChange}
-                                    required
-                                    className="w-full px-3 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors resize-none"
-                                    placeholder="Jon Doe"
-                                  />
-                                </div>
+                                <input
+                                  name="fullName"
+                                  value={billingInfo.fullName}
+                                  onChange={handleBillingChange}
+                                  required
+                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                  placeholder="John Doe"
+                                />
                               </div>
+
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
                                   Phone Number *
                                 </label>
-                                <div className="relative">
-                                  <PhoneInput
-                                    containerStyle={{ width: "100%" }}
-                                    inputStyle={{ width: "100%" }}
-                                    country={"us"}
-                                    name="phone"
-                                    value={billingInfo.phone}
-                                    onChange={(phone) =>
-                                      handleBillingChange({
-                                        target: { name: "phone", value: phone },
-                                      })
-                                    }
-                                    required
-                                  />
-                                </div>
+                                <PhoneInput
+                                  containerStyle={{ width: "100%" }}
+                                  inputStyle={{
+                                    width: "100%",
+                                    height: "48px",
+                                    fontSize: "16px",
+                                  }}
+                                  country="us"
+                                  value={billingInfo.phone}
+                                  onChange={(phone) =>
+                                    handleBillingChange({
+                                      target: { name: "phone", value: phone },
+                                    })
+                                  }
+                                  required
+                                />
                               </div>
                             </div>
 
-                            {/* Address */}
                             <div className="grid md:grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Address line 1*
+                                  Address Line 1 *
                                 </label>
-                                <div className="relative">
-                                  <input
-                                    name="line1"
-                                    value={billingInfo.line1}
-                                    onChange={handleBillingChange}
-                                    required
-                                    className="w-full px-3 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors resize-none"
-                                    placeholder="House/Flat No., Street Name, Area"
-                                  />
-                                </div>
+                                <input
+                                  name="line1"
+                                  value={billingInfo.line1}
+                                  onChange={handleBillingChange}
+                                  required
+                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                  placeholder="123 Main Street"
+                                />
                               </div>
+
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Address line 2
+                                  Address Line 2
                                 </label>
-                                <div className="relative">
-                                  <input
-                                    name="line2"
-                                    value={billingInfo.line2}
-                                    onChange={handleBillingChange}
-                                    className="w-full px-3 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors resize-none"
-                                    placeholder="House/Flat No., Street Name, Area"
-                                  />
-                                </div>
+                                <input
+                                  name="line2"
+                                  value={billingInfo.line2}
+                                  onChange={handleBillingChange}
+                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                  placeholder="Apartment, suite, etc."
+                                />
                               </div>
                             </div>
 
-                            {/* City & State */}
                             <div className="grid md:grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
                                   Country *
                                 </label>
-                                <div className="relative">
-                                  <Select
-                                    name="country"
-                                    isClearable={true}
-                                    isSearchable={true}
-                                    options={countryOptions}
-                                    onChange={(option) => {
-                                      setBillingInfo((prev) => ({
-                                        ...prev,
-                                        country: option?.value || "",
-                                      }));
-                                      setStateOptions(
-                                        State.getStatesOfCountry(
-                                          option?.value || "",
-                                        ),
-                                      );
-                                      setCityOptions(
-                                        City.getCitiesOfCountry(
-                                          option?.value || "",
-                                        ),
-                                      );
-                                    }}
-                                    required
-                                    className="basic-single"
-                                    classNamePrefix="select"
-                                    placeholder="Select Country"
-                                  />
-                                </div>
+                                <Select
+                                  isClearable
+                                  isSearchable
+                                  options={countryOptions}
+                                  value={countryOptions.find(
+                                    (opt) => opt.value === billingInfo.country
+                                  )}
+                                  onChange={(option) => {
+                                    setBillingInfo((prev) => ({
+                                      ...prev,
+                                      country: option?.value || "",
+                                      state: "",
+                                      city: "",
+                                    }));
+                                  }}
+                                  placeholder="Select Country"
+                                  className="react-select-container"
+                                  classNamePrefix="react-select"
+                                />
                               </div>
 
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
                                   State / Province *
                                 </label>
-                                <div className="relative">
-                                  <Select
-                                    name="state"
-                                    isClearable={true}
-                                    isSearchable={true}
-                                    options={states}
-                                    onChange={(option) =>
-                                      setBillingInfo((prev) => ({
-                                        ...prev,
-                                        state: option?.value,
-                                      }))
-                                    }
-                                    required
-                                    className="basic-single"
-                                    placeholder="Select State"
-                                  />
-                                </div>
+                                <Select
+                                  isClearable
+                                  isSearchable
+                                  options={State.getStatesOfCountry(
+                                    billingInfo.country
+                                  ).map((s) => ({
+                                    value: s.isoCode,
+                                    label: s.name,
+                                  }))}
+                                  value={
+                                    billingInfo.state
+                                      ? {
+                                          value: billingInfo.state,
+                                          label:
+                                            State.getStateByCodeAndCountry(
+                                              billingInfo.state,
+                                              billingInfo.country
+                                            )?.name || billingInfo.state,
+                                        }
+                                      : null
+                                  }
+                                  onChange={(option) =>
+                                    setBillingInfo((prev) => ({
+                                      ...prev,
+                                      state: option?.value || "",
+                                      city: "",
+                                    }))
+                                  }
+                                  placeholder="Select State"
+                                  className="react-select-container"
+                                  classNamePrefix="react-select"
+                                  isDisabled={!billingInfo.country}
+                                />
                               </div>
 
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
                                   City *
                                 </label>
-                                <div className="relative">
-                                  <Select
-                                    name="city"
-                                    isClearable={true}
-                                    isSearchable={true}
-                                    options={cities}
-                                    onChange={(option) =>
-                                      setBillingInfo((prev) => ({
-                                        ...prev,
-                                        city: option?.value,
-                                      }))
-                                    }
-                                    required
-                                    className="basic-single"
-                                    placeholder="Select City"
-                                  />
-                                </div>
+                                <Select
+                                  isClearable
+                                  isSearchable
+                                  options={City.getCitiesOfState(
+                                    billingInfo.country,
+                                    billingInfo.state
+                                  ).map((c) => ({
+                                    value: c.name,
+                                    label: c.name,
+                                  }))}
+                                  value={
+                                    billingInfo.city
+                                      ? {
+                                          value: billingInfo.city,
+                                          label: billingInfo.city,
+                                        }
+                                      : null
+                                  }
+                                  onChange={(option) =>
+                                    setBillingInfo((prev) => ({
+                                      ...prev,
+                                      city: option?.value || "",
+                                    }))
+                                  }
+                                  placeholder="Select City"
+                                  className="react-select-container"
+                                  classNamePrefix="react-select"
+                                  isDisabled={!billingInfo.state}
+                                />
                               </div>
 
-                              {/* Postal Code */}
                               <div>
                                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
                                   Postal Code
@@ -1016,35 +1144,25 @@ const Checkout = () => {
                                   name="postalCode"
                                   value={billingInfo.postalCode}
                                   onChange={handleBillingChange}
-                                  className="w-full px-4 py-1.5 border border-(--border-default) rounded focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                                  placeholder="54000"
+                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                  placeholder="12345"
                                 />
                               </div>
                             </div>
                           </>
                         )}
-                        <div className="space-x-2">
-                          <input
-                            type="checkbox"
-                            name="sameAsShipping"
-                            id="sameAsShipping"
-                            checked={sameAsShipping}
-                            onChange={(e) => {
-                              setSameAsShipping(e.target.checked);
-                            }
-                            }
-                          />
-                          <label htmlFor="sameAsShipping">
-                            Billing Address is same as Shipping?
-                          </label>
-                        </div>
+
                         {/* Continue Button */}
                         <button
                           type="submit"
-                          className="w-full mt-6 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg"
+                          disabled={isLoading}
+                          className="w-full mt-6 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                           {isLoading ? (
-                            <Loader size="sm" text="" />
+                            <>
+                              <Loader2 size={20} className="animate-spin" />
+                              <span>Processing...</span>
+                            </>
                           ) : (
                             "Continue to Payment"
                           )}
@@ -1064,16 +1182,89 @@ const Checkout = () => {
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-(--text-heading)">
-                        Payment Method
+                        Payment & Shipping Method
                       </h2>
                       <p className="text-sm text-(--text-secondary)">
-                        Choose how you want to pay
+                        Choose your payment and shipping options
                       </p>
                     </div>
                   </div>
 
+                  {/* Error Display */}
+                  {authError && (
+                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                      <AlertCircle
+                        size={20}
+                        className="text-red-600 mt-0.5 shrink-0"
+                      />
+                      <p className="text-sm text-red-800 whitespace-pre-line">
+                        {authError}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Shipping Method Selection */}
+                  {loadingShipping ? (
+                    <div className="mb-6 flex items-center justify-center py-8">
+                      <Loader2 size={32} className="animate-spin text-(--color-brand-primary)" />
+                      <span className="ml-3 text-(--text-secondary)">
+                        Loading shipping methods...
+                      </span>
+                    </div>
+                  ) : shippingMethods.length > 0 ? (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold mb-4 text-(--text-heading)">
+                        Shipping Method
+                      </h3>
+                      <div className="space-y-3">
+                        {shippingMethods.map((method) => (
+                          <label
+                            key={method.id}
+                            className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                              selectedShippingMethod === method.method
+                                ? "border-(--color-brand-primary) bg-blue-50"
+                                : "border-(--border-default) hover:border-(--color-brand-primary)"
+                            }`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <input
+                                type="radio"
+                                name="shippingMethod"
+                                value={method.method}
+                                checked={selectedShippingMethod === method.method}
+                                onChange={(e) =>
+                                  setSelectedShippingMethod(e.target.value)
+                                }
+                                className="w-5 h-5 text-(--color-brand-primary)"
+                              />
+                              <div>
+                                <p className="font-semibold text-(--text-heading)">
+                                  {method.method === "STANDARD"
+                                    ? "Standard Shipping"
+                                    : "Express Shipping"}
+                                </p>
+                                <p className="text-sm text-(--text-secondary)">
+                                  {method.method === "STANDARD"
+                                    ? "3-5 business days"
+                                    : "1-2 business days"}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="font-bold text-(--text-heading)">
+                              Rs. {parseFloat(method.price).toLocaleString()}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   {/* Payment Method Selection */}
                   <div className="space-y-4 mb-6">
+                    <h3 className="text-lg font-semibold text-(--text-heading)">
+                      Payment Method
+                    </h3>
+
                     {/* Cash on Delivery */}
                     <label
                       className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${
@@ -1142,6 +1333,10 @@ const Checkout = () => {
                   {/* Card Details (if card payment selected) */}
                   {paymentMethod === "card" && (
                     <div className="border-t border-(--border-default) pt-6 space-y-4">
+                      <h3 className="text-lg font-semibold text-(--text-heading)">
+                        Card Details
+                      </h3>
+
                       <div>
                         <label className="block text-sm font-medium text-(--text-heading) mb-2">
                           Card Number *
@@ -1200,22 +1395,16 @@ const Checkout = () => {
                           <label className="block text-sm font-medium text-(--text-heading) mb-2">
                             CVV *
                           </label>
-                          <div className="relative">
-                            <Lock
-                              size={18}
-                              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-(--text-secondary)"
-                            />
-                            <input
-                              type="text"
-                              name="cvv"
-                              value={billingInfo.cvv}
-                              onChange={handleBillingChange}
-                              required
-                              maxLength={4}
-                              className="w-full pl-10 pr-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                              placeholder="123"
-                            />
-                          </div>
+                          <input
+                            type="text"
+                            name="cvv"
+                            value={billingInfo.cvv}
+                            onChange={handleBillingChange}
+                            required
+                            maxLength={4}
+                            className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                            placeholder="123"
+                          />
                         </div>
                       </div>
                     </div>
@@ -1224,15 +1413,24 @@ const Checkout = () => {
                   <div className="flex gap-4 mt-6">
                     <button
                       onClick={() => setStep(1)}
-                      className="flex-1 border-2 border-(--border-inverse) text-(--text-primary) px-6 py-4 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium"
+                      disabled={isLoading}
+                      className="flex-1 border-2 border-(--border-inverse) text-(--text-primary) px-6 py-4 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium disabled:opacity-50"
                     >
                       Back
                     </button>
                     <button
                       onClick={handlePlaceOrder}
-                      className="flex-1 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg"
+                      disabled={isLoading || shippingMethods.length === 0}
+                      className="flex-1 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      {isLoading ? <Loader size="sm" text="" /> : "Place Order"}
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        "Place Order"
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1240,74 +1438,104 @@ const Checkout = () => {
             </div>
 
             {/* Right Column - Order Summary */}
-            {orderItems?.length === 0 ? null : (
-            <div className="lg:col-span-1">
-              <div className="bg-white border border-(--border-default) rounded-xl p-6 sticky top-6">
-                <h3 className="text-xl font-bold mb-4 text-(--text-heading)">
-                  Order Summary
-                </h3>
+            {orderItems?.length > 0 && (
+              <div className="lg:col-span-1">
+                <div className="bg-white border border-(--border-default) rounded-xl p-6 sticky top-6">
+                  <h3 className="text-xl font-bold mb-4 text-(--text-heading)">
+                    Order Summary
+                  </h3>
 
-                {/* Items */}
-                <div className="space-y-4 mb-6 pb-6 border-b border-(--border-default)">
-                  {orderItems?.map((item) => (
-                    <div key={item.id} className="flex gap-3">
-                      <div className="w-16 h-16 bg-(--bg-surface) rounded-lg overflow-hidden shrink-0">
-                        <Image
-                          src={`${item.thumbnail}` || "/placeholder.png"}
-                          width={100}
-                          height={100}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
+                  {/* Items */}
+                  <div className="space-y-4 mb-6 pb-6 border-b border-(--border-default) max-h-96 overflow-y-auto">
+                    {orderItems.map((item) => (
+                      <div key={item.id} className="flex gap-3">
+                        <div className="w-16 h-16 bg-(--bg-surface) rounded-lg overflow-hidden shrink-0">
+                          <Image
+                            src={item.thumbnail || "/placeholder.png"}
+                            width={64}
+                            height={64}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm text-(--text-heading) line-clamp-2">
+                            {item.name}
+                          </h4>
+                          <p className="text-xs text-(--text-secondary) mt-1">
+                            Qty: {item.quantity}
+                          </p>
+                          <p className="text-sm font-semibold text-(--text-heading) mt-1">
+                            Rs. {parseFloat(item.itemTotal || 0).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm text-(--text-heading) line-clamp-2">
-                          {item.name}
-                        </h4>
-                        <p className="text-xs text-(--text-secondary) mt-1">
-                          Qty: {item.quantity}
-                        </p>
-                        <p className="text-sm font-semibold text-(--text-heading) mt-1">
-                          Rs. {total || 0}
-                        </p>
-                      </div>
+                    ))}
+                  </div>
+
+                  {/* Price Breakdown */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-(--text-secondary)">Subtotal</span>
+                      <span className="font-medium">
+                        Rs. {parseFloat(subtotal || 0).toLocaleString()}
+                      </span>
                     </div>
-                  ))}
-                </div>
 
-                {/* Price Breakdown */}
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-sm text-(--text-secondary)">
-                    <span>Subtotal</span>
-                    <span className="font-medium">
-                      Rs. {total}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm text-(--text-secondary)">
-                    <span>Shipping</span>
-                    <span className="font-medium">
-                      Rs. {shipping}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm text-(--text-secondary)">
-                    <span>Tax ({tax})</span>
-                    <span className="font-medium">
-                      Rs. {tax}
-                    </span>
-                  </div>
-                  <div className="border-t border-(--border-default) pt-3">
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-(--text-heading)">
-                        Total
-                      </span>
-                      <span className="font-bold text-(--text-heading) text-xl">
-                        Rs. {total}
-                      </span>
+                    {promotionSavings > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Promotion Savings</span>
+                        <span className="font-medium">
+                          -Rs. {parseFloat(promotionSavings).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Coupon Discount</span>
+                        <span className="font-medium">
+                          -Rs. {parseFloat(discountAmount).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    {step === 2 && shippingMethods.length > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-(--text-secondary)">Shipping</span>
+                        <span className="font-medium">
+                          Rs.{" "}
+                          {parseFloat(
+                            shippingMethods.find(
+                              (m) => m.method === selectedShippingMethod
+                            )?.price || 0
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    {taxAmount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-(--text-secondary)">Tax</span>
+                        <span className="font-medium">
+                          Rs. {parseFloat(taxAmount).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="border-t border-(--border-default) pt-3">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-(--text-heading)">
+                          Total
+                        </span>
+                        <span className="font-bold text-(--text-heading) text-xl">
+                          Rs. {parseFloat(total || subtotal || 0).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
             )}
           </div>
         </div>

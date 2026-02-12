@@ -1,9 +1,10 @@
 import { prisma } from "../config/prisma.js";
 import Decimal from "decimal.js";
-import { calculatePricing } from "../constants/pricing.js";
+import { calculatePricingWithPromotions } from "../constants/pricing.js";
 
 /**
  * Initiate checkout and create order
+ * POST /api/checkout
  */
 const initiateCheckout = async (req, res) => {
     const userId = req.user?.id;
@@ -25,7 +26,7 @@ const initiateCheckout = async (req, res) => {
     try {
         const result = await prisma.$transaction(
             async (tx) => {
-                // 1. Fetch user's cart items with full details
+                // 1. Fetch user's cart with full details
                 const cart = await tx.cart.findFirst({
                     where: {
                         userId,
@@ -42,10 +43,18 @@ const initiateCheckout = async (req, res) => {
                                                 images: true,
                                             },
                                         },
+                                        promotion: {
+                                            where: {
+                                                isActive: true,
+                                                startsAt: { lte: new Date() },
+                                                endsAt: { gte: new Date() },
+                                            },
+                                        },
                                     },
                                 },
                             },
                         },
+                        coupon: true,
                     },
                 });
 
@@ -77,8 +86,9 @@ const initiateCheckout = async (req, res) => {
                         continue;
                     }
 
-                    const availableStock = (variant.inventory?.quantity || 0) - 
-                                         (variant.inventory?.reserved || 0);
+                    const availableStock =
+                        (variant.inventory?.quantity || 0) -
+                        (variant.inventory?.reserved || 0);
                     if (availableStock < item.quantity) {
                         inventoryIssues.push({
                             variantId: item.variantId,
@@ -121,36 +131,44 @@ const initiateCheckout = async (req, res) => {
                     }
                 }
 
-                // 4. Fetch shipping rate
+                // 4. Fetch shipping rate with updated schema (includes currency)
                 const shippingRate = await tx.shippingRate.findFirst({
                     where: {
-                        country: shippingAddress.country,
-                        state: shippingAddress.state || undefined,
+                        country: shippingAddress.country.toUpperCase(),
+                        OR: [
+                            { state: shippingAddress.state ? shippingAddress.state.toUpperCase() : null },
+                            { state: null }
+                        ],
                         method: shippingMethod,
                         isActive: true,
                     },
                     orderBy: {
-                        state: 'desc', // Prefer state-specific rates over country-wide
+                        state: "desc", // Prefer state-specific rates over country-wide
                     },
                 });
 
                 if (!shippingRate) {
                     throw new Error(
-                        `No shipping rate found for ${shippingAddress.country}, ${shippingAddress.state} with method ${shippingMethod}`
+                        `No shipping rate found for ${shippingAddress.country}${
+                            shippingAddress.state ? `, ${shippingAddress.state}` : ""
+                        } with method ${shippingMethod}`
                     );
                 }
 
                 // 5. Validate and fetch coupon if provided
-                let coupon = null;
-                if (couponCode) {
+                let coupon = cart.coupon || null;
+                if (couponCode && !coupon) {
                     coupon = await tx.coupon.findUnique({
-                        where: { code: couponCode },
+                        where: { code: couponCode.toUpperCase() },
                     });
 
                     if (!coupon) {
                         throw new Error("Invalid coupon code");
                     }
+                }
 
+                // Validate coupon if present
+                if (coupon) {
                     if (!coupon.isActive) {
                         throw new Error("Coupon is no longer active");
                     }
@@ -159,21 +177,22 @@ const initiateCheckout = async (req, res) => {
                         throw new Error("Coupon has expired");
                     }
 
-                    if (
-                        coupon.usageLimit &&
-                        coupon.usedCount >= coupon.usageLimit
-                    ) {
+                    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
                         throw new Error("Coupon usage limit reached");
                     }
                 }
 
-                // 6. Calculate order pricing using the centralized function
-                const pricing = calculatePricing({
+                // 6. Calculate order pricing with promotions
+                // TODO: Calculate tax rate based on address (use tax service)
+                const taxRate = 0.08;
+
+                const pricing = await calculatePricingWithPromotions({
                     items: cartItems,
                     coupon,
                     shippingRate,
-                    taxRate: 0.08, // TODO: Calculate based on address (use tax service)
+                    taxRate,
                     address: shippingAddress,
+                    prisma: tx,
                 });
 
                 // 7. Validate minimum cart total for coupon
@@ -189,14 +208,20 @@ const initiateCheckout = async (req, res) => {
                 // 8. Validate shipping rate min/max order
                 if (shippingRate.minOrder || shippingRate.maxOrder) {
                     const subtotalDecimal = new Decimal(pricing.subtotal);
-                    if (shippingRate.minOrder && subtotalDecimal.lessThan(shippingRate.minOrder)) {
+                    if (
+                        shippingRate.minOrder &&
+                        subtotalDecimal.lessThan(shippingRate.minOrder)
+                    ) {
                         throw new Error(
-                            `Minimum order value of ${shippingRate.minOrder} required for this shipping method`
+                            `Minimum order value of ${shippingRate.currency} ${shippingRate.minOrder} required for this shipping method`
                         );
                     }
-                    if (shippingRate.maxOrder && subtotalDecimal.greaterThan(shippingRate.maxOrder)) {
+                    if (
+                        shippingRate.maxOrder &&
+                        subtotalDecimal.greaterThan(shippingRate.maxOrder)
+                    ) {
                         throw new Error(
-                            `Maximum order value of ${shippingRate.maxOrder} exceeded for this shipping method`
+                            `Maximum order value of ${shippingRate.currency} ${shippingRate.maxOrder} exceeded for this shipping method`
                         );
                     }
                 }
@@ -206,7 +231,7 @@ const initiateCheckout = async (req, res) => {
                     data: {
                         userId,
                         status: "PENDING",
-                        
+
                         // Pricing breakdown
                         subtotal: pricing.subtotal,
                         discountPct: pricing.discountPct,
@@ -216,10 +241,10 @@ const initiateCheckout = async (req, res) => {
                         shippingMethod: pricing.shippingMethod,
                         shippingAmount: pricing.shippingAmount,
                         total: pricing.total,
-                        
+
                         // Coupon reference
                         couponId: pricing.couponId,
-                        
+
                         // Address snapshots
                         shippingAddr: {
                             fullName: shippingAddress.fullName,
@@ -246,7 +271,6 @@ const initiateCheckout = async (req, res) => {
 
                 // 10. Create OrderItems with validated pricing
                 const orderItemsData = pricing.items.map((pricedItem) => {
-                    const cartItem = cartItems.find(ci => ci.variantId === pricedItem.variantId);
                     return {
                         orderId: order.id,
                         variantId: pricedItem.variantId,
@@ -278,7 +302,7 @@ const initiateCheckout = async (req, res) => {
                 }
 
                 // 12. Increment coupon usage (with race condition protection)
-                if (coupon) {
+                if (coupon && pricing.couponId) {
                     const updated = await tx.coupon.updateMany({
                         where: {
                             id: coupon.id,
@@ -308,7 +332,7 @@ const initiateCheckout = async (req, res) => {
                     where: { cartId: cart.id },
                 });
 
-                // 15. Create audit log
+                // 15. Create audit log with currency information
                 await tx.auditLog.create({
                     data: {
                         userId,
@@ -317,9 +341,11 @@ const initiateCheckout = async (req, res) => {
                         entityId: order.id,
                         metadata: {
                             subtotal: pricing.subtotal,
+                            promotionSavings: pricing.promotionSavings,
                             discountAmount: pricing.discountAmount,
                             taxAmount: pricing.taxAmount,
                             shippingAmount: pricing.shippingAmount,
+                            shippingCurrency: shippingRate.currency,
                             total: pricing.total,
                             itemsCount: pricing.itemCount,
                             couponCode: pricing.couponCode,
@@ -334,9 +360,12 @@ const initiateCheckout = async (req, res) => {
                     orderId: order.id,
                     total: pricing.total,
                     subtotal: pricing.subtotal,
+                    promotionSavings: pricing.promotionSavings,
                     discountAmount: pricing.discountAmount,
+                    totalSavings: pricing.totalSavings,
                     taxAmount: pricing.taxAmount,
                     shippingAmount: pricing.shippingAmount,
+                    shippingCurrency: shippingRate.currency,
                     itemsCount: pricing.itemCount,
                     couponApplied: !!pricing.couponCode,
                 };
@@ -357,12 +386,19 @@ const initiateCheckout = async (req, res) => {
 
         // Handle inventory errors specially
         if (error.message.includes("INVENTORY_ERROR")) {
-            const errorData = JSON.parse(error.message);
-            return res.status(400).json({
-                success: false,
-                error: "Inventory validation failed",
-                details: errorData.issues,
-            });
+            try {
+                const errorData = JSON.parse(error.message);
+                return res.status(400).json({
+                    success: false,
+                    error: "Inventory validation failed",
+                    details: errorData.issues,
+                });
+            } catch (parseError) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Inventory validation failed",
+                });
+            }
         }
 
         // Handle known errors
@@ -376,9 +412,14 @@ const initiateCheckout = async (req, res) => {
             "Coupon has expired",
             "Coupon usage limit reached",
             "Coupon usage limit reached during checkout",
+            "No shipping rate found",
+            "Minimum cart total",
+            "Minimum order value",
+            "Maximum order value",
+            "Inventory changed during checkout",
         ];
 
-        if (knownErrors.some(known => error.message.includes(known))) {
+        if (knownErrors.some((known) => error.message.includes(known))) {
             return res.status(400).json({
                 success: false,
                 error: error.message,
@@ -394,9 +435,11 @@ const initiateCheckout = async (req, res) => {
 
 /**
  * Validate cart before checkout (Optional pre-check endpoint)
+ * POST /api/checkout/validate
  */
 const validateCheckout = async (req, res) => {
     const userId = req.user?.id;
+    const { shippingAddressId, shippingMethod = "STANDARD" } = req.body;
 
     try {
         const cart = await prisma.cart.findFirst({
@@ -411,10 +454,18 @@ const validateCheckout = async (req, res) => {
                             include: {
                                 inventory: true,
                                 product: true,
+                                promotion: {
+                                    where: {
+                                        isActive: true,
+                                        startsAt: { lte: new Date() },
+                                        endsAt: { gte: new Date() },
+                                    },
+                                },
                             },
                         },
                     },
                 },
+                coupon: true,
             },
         });
 
@@ -428,6 +479,7 @@ const validateCheckout = async (req, res) => {
         const issues = [];
         const validItems = [];
 
+        // Validate inventory
         for (const item of cart.items) {
             const variant = item.variant;
 
@@ -448,8 +500,8 @@ const validateCheckout = async (req, res) => {
                 continue;
             }
 
-            const availableStock = (variant.inventory?.quantity || 0) - 
-                                  (variant.inventory?.reserved || 0);
+            const availableStock =
+                (variant.inventory?.quantity || 0) - (variant.inventory?.reserved || 0);
             if (availableStock < item.quantity) {
                 issues.push({
                     variantId: item.variantId,
@@ -471,10 +523,38 @@ const validateCheckout = async (req, res) => {
             });
         }
 
-        // Calculate pricing for valid items
-        const pricing = calculatePricing({
+        // Get shipping rate if address provided
+        let shippingRate = null;
+        if (shippingAddressId) {
+            const shippingAddress = await prisma.address.findFirst({
+                where: { id: shippingAddressId, userId },
+            });
+
+            if (shippingAddress) {
+                shippingRate = await prisma.shippingRate.findFirst({
+                    where: {
+                        country: shippingAddress.country.toUpperCase(),
+                        OR: [
+                            { state: shippingAddress.state ? shippingAddress.state.toUpperCase() : null },
+                            { state: null }
+                        ],
+                        method: shippingMethod,
+                        isActive: true,
+                    },
+                    orderBy: {
+                        state: "desc",
+                    },
+                });
+            }
+        }
+
+        // Calculate pricing with promotions
+        const pricing = await calculatePricingWithPromotions({
             items: validItems,
-            taxRate: 0.08, // Default tax rate
+            coupon: cart.coupon,
+            shippingRate,
+            taxRate: 0.08, // TODO: Calculate based on address
+            prisma,
         });
 
         return res.status(200).json({
@@ -483,8 +563,21 @@ const validateCheckout = async (req, res) => {
             data: {
                 itemsCount: pricing.itemCount,
                 subtotal: pricing.subtotal,
+                promotionSavings: pricing.promotionSavings,
+                discountAmount: pricing.discountAmount,
+                totalSavings: pricing.totalSavings,
                 estimatedTax: pricing.taxAmount,
+                estimatedShipping: pricing.shippingAmount,
+                shippingCurrency: shippingRate?.currency || "PKR",
                 estimatedTotal: pricing.total,
+                hasShippingRate: !!shippingRate,
+                coupon: cart.coupon
+                    ? {
+                          code: cart.coupon.code,
+                          discountType: cart.coupon.discountType,
+                          discountValue: cart.coupon.discountValue,
+                      }
+                    : null,
             },
         });
     } catch (error) {
@@ -496,4 +589,77 @@ const validateCheckout = async (req, res) => {
     }
 };
 
-export { initiateCheckout, validateCheckout };
+/**
+ * Get available shipping methods for address
+ * POST /api/checkout/shipping-methods
+ */
+const getShippingMethods = async (req, res) => {
+    const { shippingAddressId } = req.body;
+
+    if (!shippingAddressId) {
+        return res.status(400).json({
+            success: false,
+            error: "Shipping address ID is required",
+        });
+    }
+
+    try {
+        const userId = req.user?.id;
+
+        const address = await prisma.address.findFirst({
+            where: { id: shippingAddressId, userId },
+        });
+
+        if (!address) {
+            return res.status(404).json({
+                success: false,
+                error: "Address not found",
+            });
+        }
+
+        const shippingRates = await prisma.shippingRate.findMany({
+            where: {
+                country: address.country.toUpperCase(),
+                OR: [
+                    { state: address.state ? address.state.toUpperCase() : null },
+                    { state: null }
+                ],
+                isActive: true,
+            },
+            orderBy: [{ price: "asc" }],
+        });
+
+        if (shippingRates.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: `No shipping methods available for ${address.country}${
+                    address.state ? `, ${address.state}` : ""
+                }`,
+            });
+        }
+
+        const methods = shippingRates.map((rate) => ({
+            id: rate.id,
+            method: rate.method,
+            price: rate.price,
+            currency: rate.currency,
+            minOrder: rate.minOrder,
+            maxOrder: rate.maxOrder,
+            country: rate.country,
+            state: rate.state,
+        }));
+
+        return res.status(200).json({
+            success: true,
+            data: methods,
+        });
+    } catch (error) {
+        console.error("Get shipping methods error:", error);
+        return res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+        });
+    }
+};
+
+export { initiateCheckout, validateCheckout, getShippingMethods };

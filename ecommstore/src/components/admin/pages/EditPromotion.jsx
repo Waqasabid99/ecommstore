@@ -132,6 +132,7 @@ const EditPromotion = () => {
       if (categoriesRes.data.success) {
         setCategories(categoriesRes.data.data);
       }
+
     } catch (error) {
       console.error("Fetch data error:", error);
       toast.error("Failed to load data");
@@ -325,7 +326,7 @@ const EditPromotion = () => {
               v.productName.toLowerCase().includes(localSearch.toLowerCase())
           );
         case "CATEGORY":
-          return categories.filter((c) =>
+          return filteredCategories.filter((c) =>
             c.name.toLowerCase().includes(localSearch.toLowerCase())
           );
         default:
@@ -479,6 +480,10 @@ const EditPromotion = () => {
     );
   };
 
+  const AllCategories = categories.map((category) => category)
+  const ChildCategories = categories.map((c) => c.children.map((child) => child))
+  const filteredCategories = [...AllCategories, ...ChildCategories].flat()
+
   const getSelectedItemsDisplay = () => {
     let items = [];
     let key = "";
@@ -493,7 +498,7 @@ const EditPromotion = () => {
         key = "variantIds";
         break;
       case "CATEGORY":
-        items = categories.filter((c) => formData.categoryIds.includes(c.id));
+        items = filteredCategories.filter((c) => formData.categoryIds.includes(c.id));
         key = "categoryIds";
         break;
     }

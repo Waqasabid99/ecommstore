@@ -18,6 +18,7 @@ import reviewRouter from "./routes/review.route.js";
 import returnRouter from "./routes/return.routes.js";
 import contactRouter from "./routes/contactus.routes.js";
 import promotionRouter from "./routes/promotion.routes.js";
+import shippingRouter from "./routes/shipping.routes.js";
 const app = express();
 const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
 
@@ -53,6 +54,7 @@ app.use("/reviews", reviewRouter);
 app.use("/retruns-refunds", returnRouter);
 app.use("/dashboard", dashboardRouter);
 app.use("/contact", contactRouter);
+app.use("/shipping", shippingRouter);
 app.use("/seed", seedRouter);
 
 app.listen(port, () => {

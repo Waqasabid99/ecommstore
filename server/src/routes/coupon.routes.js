@@ -3,25 +3,9 @@ import { verifyUser } from "../middleware/auth.middleware.js";
 import { requireAdmin } from "../middleware/rbac.middleware.js";
 
 // Import coupon controllers
-import {
-    getAllCoupons,
-    getCouponById,
-    createCoupon,
-    updateCoupon,
-    deleteCoupon,
-    toggleCouponStatus,
-    validateCoupon,
-    getCouponStats,
-    bulkCreateCoupons,
-    applyCoupon,
-    removeCoupon,
-} from "../controllers/coupons.controller.js";
+import { getAllCoupons, getCouponById, createCoupon, updateCoupon, deleteCoupon, toggleCouponStatus, validateCoupon, getCouponStats, bulkCreateCoupons, applyCoupon, removeCoupon } from "../controllers/coupons.controller.js";
 
-
-
-// =====================================================
 // COUPON ROUTES
-// =====================================================
 const couponRouter = express.Router();
 
 // ============ ADMIN ROUTES ============
@@ -52,5 +36,7 @@ couponRouter.post("/bulk", verifyUser, requireAdmin, bulkCreateCoupons);
 // ============ PUBLIC/USER ROUTES ============
 // POST /api/coupons/validate - Validate coupon (public preview)
 couponRouter.post("/validate", validateCoupon);
+couponRouter.post("/apply", verifyUser, applyCoupon);
+couponRouter.delete("/remove", verifyUser, removeCoupon);
 
-export default couponRouter ;
+export default couponRouter;

@@ -14,7 +14,7 @@ const Footer = () => {
                 {/* About section */}
                 <div>
                     <h2 className="font-bold text-2xl">Ecom Store.</h2>
-                    <p className="text-[13px] text-(--text-secondary) my-3">Lorem ipsum dolor, sit amet consectetur adipisicing elit. Veniam reprehenderit adipisci eum, recusandae quas dolorem!</p>
+                    <p className="text-[13px] text-(--text-secondary) my-3">At Ecom Store, we are committed to providing you with the best possible shopping experience. Get started today and experience the convenience of online shopping.</p>
                     <h3 className="font-semibold mb-2">Follow us on Social Media</h3>
                     <div className="flex gap-3" >
                         {icons.map((Icon) => (
@@ -55,7 +55,7 @@ const Footer = () => {
                 {/* Newsletter section */}
                 <div>
                     <h3>Subscribe to our newsletter</h3>
-                    <p className="text-[13px] text-(--text-secondary) my-3">Lorem ipsum dolor sit amet consectetur adipisicing elit. Tempora, sit?</p>
+                    <p className="text-[13px] text-(--text-secondary) my-3">Sign up for our newsletter to get the latest updates and exclusive offers.</p>
                     <form className="flex flex-col justify-start items-start">
                         <input type="email" placeholder="Enter your email" className="bg-[#323232] w-10/12 p-2 rounded-md mb-3" />
                         <button className="bg-(--btn-bg-primary) text-white px-6 py-2 rounded-full hover:bg-(--btn-bg-hover-primary)">Subscribe</button>

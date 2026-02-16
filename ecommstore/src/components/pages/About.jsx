@@ -95,11 +95,11 @@ const About = () => {
             <div className="md:w-1/2 flex justify-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-(--color-brand-primary) opacity-10 rounded-full blur-3xl"></div>
-                <img
+                {/* <img
                   src="https://images.unsplash.com/photo-1556656793-08538906a9f8?w=600&h=600&fit=crop"
                   alt="About Us"
                   className="relative rounded-2xl shadow-2xl w-full max-w-md"
-                />
+                /> */}
               </div>
             </div>
 

@@ -2,12 +2,12 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-const JWT_SECRET =
-    process.env.NODE_ENV === "production"
-        ? process.env.JWT_SECRET
-        : "secret";
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" 
+    ? (() => { throw new Error("JWT_SECRET must be set in production") })() 
+    : "secret");
+    
 const SALT_ROUNDS =
-    process.env.NODE_ENV === "production" ? Number(process.env.SALT_ROUNDS) : 10;
+    process.env.NODE_ENV === "production" ? Number(process.env.SALT_ROUNDS || 12) : 10;
 const EXPIREYTIME =
     process.env.NODE_ENV === "production" ? process.env.EXPIREYTIME : "1h";
 

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   ShoppingCart,
   Heart,
@@ -19,7 +19,7 @@ const AdminNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openProfileDropDown, setOpenProfileDropDown] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const { logout, checkAuth } = useAuthStore();
+  const { logout, isLoading } = useAuthStore();
   const { isAuthenticated, user } = useAuth();
 
   const { getCartItems, getCartSummary } = useCartStore();
@@ -31,18 +31,21 @@ const AdminNavbar = () => {
   const isUserPage = pathname.startsWith("/user/");
   const isAdminPage = pathname.startsWith("/admin");
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
   const handleProfileDropDown = () => {
     setOpenProfileDropDown(!openProfileDropDown);
   };
 
   const handleLogout = async () => {
-    await logout();
-    setOpenProfileDropDown(false);
-    navigate.push("/");
+    setIsCartOpen(false);
+    try {
+        await logout();
+        navigate.push("/");
+        navigate.refresh();
+    } catch (error) {
+        console.error("Logout error:", error);
+    } finally {
+        setOpenProfileDropDown(false);
+    }
   };
 
   return (
@@ -205,7 +208,7 @@ const AdminNavbar = () => {
                             >
                               <LogOut size={18} />
                               <span className="font-medium text-sm">
-                                Logout
+                                {isLoading ? "Logging out..." : "Logout"}
                               </span>
                             </button>
                           </div>
@@ -268,7 +271,7 @@ const AdminNavbar = () => {
                             >
                               <LogOut size={18} />
                               <span className="font-medium text-sm">
-                                Logout
+                                {isLoading ? "Logging out..." : "Logout"}
                               </span>
                             </button>
                           </div>

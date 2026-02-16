@@ -88,7 +88,13 @@ const useAuthStore = create(
       logout: async () => {
         set({ isLoading: true });
         try {
-          await api.post("/auth/logout");
+          const { data } = await api.post("/auth/logout");
+          if (!data.success) {
+            throw new Error(data.message || "Logout failed");
+          }
+          set({
+            isLoading: false,
+          })
         } finally {
           get().forceLogout();
           useCartStore.getState().resetCart();

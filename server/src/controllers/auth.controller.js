@@ -160,24 +160,28 @@ const resetPassword = async (req, res) => {
     }
 };
 
-// Forget Password
+// Forgot Password - Generate reset token
 const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     try {
-        const user = await prisma.user.findUnique({ where: { email, deletedAt: null } });
+        const user = await prisma.user.findUnique({ 
+            where: { email, deletedAt: null } 
+        });
 
+        // Always return success to prevent email enumeration
         if (!user) {
             return res.status(200).json({
                 success: true,
-                message: "A reset link has been sent",
+                message: "If an account exists, a reset link has been sent",
             });
         }
 
-        // Generate secure token
-        const rawToken = generateRefreshToken();
-        const tokenHash = hashToken(rawToken);
-        // Invalidate old tokens
+        // Generate secure token (32 bytes = 64 hex chars)
+        const rawToken = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+        
+        // Invalidate any existing unused tokens for this user
         await prisma.passwordResetToken.updateMany({
             where: {
                 userId: user.id,
@@ -185,27 +189,32 @@ const forgotPassword = async (req, res) => {
             },
             data: { used: true },
         });
-        // Create refresh token in DB
-        await prisma.refreshToken.create({
+
+        // Create password reset token (NOT refresh token)
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+        await prisma.passwordResetToken.create({
             data: {
                 userId: user.id,
                 tokenHash: tokenHash,
-                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                ipAddress: req.ip,
-                userAgent: req.headers["user-agent"],
+                expiresAt: expiresAt,
             },
         });
 
-        // Send email (pseudo)
+        // Send email (implement your email service)
         const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${rawToken}`;
-
-        // await sendEmail(user.email, resetLink);
+        
+        // await sendEmail({
+        //     to: user.email,
+        //     subject: "Password Reset Request",
+        //     html: `Click <a href="${resetLink}">here</a> to reset your password. Expires in 15 minutes.`
+        // });
 
         res.status(200).json({
             success: true,
-            message: "A reset link has been sent",
+            message: "If an account exists, a reset link has been sent",
         });
     } catch (error) {
+        console.error("Forgot password error:", error);
         res.status(500).json({
             success: false,
             message: "Internal server error",
@@ -213,16 +222,29 @@ const forgotPassword = async (req, res) => {
     }
 };
 
-// Create new password after forget password
+// Create new password after forgot password
 const createNewPassword = async (req, res) => {
     const { token, newPassword } = req.body;
 
-    try {
-        const tokenHash = hashToken(token);
+    // Validate input
+    if (!token || !newPassword) {
+        return res.status(400).json({
+            success: false,
+            message: "Token and new password are required",
+        });
+    }
 
+    if (newPassword.length < 8) {
+        return res.status(400).json({
+            success: false,
+            message: "Password must be at least 8 characters",
+        });
+    }
+
+    try {
         const resetToken = await prisma.passwordResetToken.findFirst({
             where: {
-                tokenHash,
+                tokenHash: hashToken(token),
                 used: false,
                 expiresAt: { gt: new Date() },
             },
@@ -236,9 +258,10 @@ const createNewPassword = async (req, res) => {
             });
         }
 
+        // Hash new password
         const hashedPassword = await hashPassword(newPassword);
 
-        // TRANSACTION
+        // Transaction: Update password and mark token as used
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: resetToken.userId },
@@ -249,13 +272,19 @@ const createNewPassword = async (req, res) => {
                 where: { id: resetToken.id },
                 data: { used: true },
             });
+
+            // Optional: Invalidate all existing refresh tokens for security
+            await tx.refreshToken.deleteMany({
+                where: { userId: resetToken.userId },
+            });
         });
 
         res.status(200).json({
             success: true,
-            message: "Password reset successful",
+            message: "Password reset successful. Please login with your new password.",
         });
     } catch (error) {
+        console.error("Create new password error:", error);
         res.status(500).json({
             success: false,
             message: "Internal server error",
@@ -266,7 +295,7 @@ const createNewPassword = async (req, res) => {
 // Logout user
 const logoutUser = async (req, res) => {
     try {
-        const refreshToken = req.cookies.refreshToken;
+        const refreshToken = req?.cookies?.refreshToken || req?.authorization?.split(" ")[1];
 
         if (refreshToken) {
             await prisma.refreshToken.deleteMany({
@@ -276,19 +305,28 @@ const logoutUser = async (req, res) => {
             });
         }
 
-        res.clearCookie("accessToken")
-            .clearCookie("refreshToken")
+        res.clearCookie("accessToken", { 
+                httpOnly: true, 
+                secure: process.env.NODE_ENV === "production" ? true : false,
+                sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+            })
+            .clearCookie("refreshToken", {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production" ? true : false,
+                sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+            })
             .status(200)
             .json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false });
+        console.log(err)
+        return res.status(500).json({ success: false });
     }
 };
 
 // Refresh access token
 const refreshAccessToken = async (req, res) => {
     try {
-        const refreshToken = req.cookies.refreshToken;
+        const refreshToken = req?.cookies?.refreshToken || req?.authorization?.split(" ")[1];
         if (!refreshToken) {
             return res.status(401).json({ success: false });
         }
@@ -308,21 +346,23 @@ const refreshAccessToken = async (req, res) => {
         });
 
         // Rotate refresh token
-        await prisma.refreshToken.delete({ where: { id: storedToken.id } });
-
-        const newRefreshToken = generateRefreshToken();
-        await prisma.refreshToken.create({
-            data: {
-                userId: user.id,
-                tokenHash: hashToken(newRefreshToken),
-                expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            },
+        const result = await prisma.$transaction(async (tx) => {
+            await tx.refreshToken.deleteMany({ where: { userId: user.id } });
+            const newRefreshToken = generateRefreshToken();
+            await tx.refreshToken.create({
+                data: {
+                    userId: user.id,
+                    tokenHash: hashToken(newRefreshToken),
+                    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                },
+            });
+            return newRefreshToken;
         });
 
         const newAccessToken = generateToken(user);
 
         res.cookie("accessToken", newAccessToken, cookieOptions)
-            .cookie("refreshToken", newRefreshToken, refreshCookieOptions)
+            .cookie("refreshToken", result, refreshCookieOptions)
             .json({ success: true });
     } catch (err) {
         console.log(err);

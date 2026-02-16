@@ -1,3 +1,4 @@
+'use client';
 import { ArrowRight, Bookmark, Calendar, Clock, Eye, User } from "lucide-react";
 
 const BlogCard = ({ post, featured = false }) => {

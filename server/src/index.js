@@ -21,12 +21,12 @@ import promotionRouter from "./routes/promotion.routes.js";
 import shippingRouter from "./routes/shipping.routes.js";
 import { hostname } from "os";
 const app = express();
-const port = process.env.ENVIRONMENT === "production" ? process.env.PORT : 5000;
+const port = process.env.NODE_ENV === "production" ? process.env.PORT : 5000;
 
 app.use(
     cors({
         origin:
-            process.env.ENVIRONMENT === "production"
+            process.env.NODE_ENV === "production"
                 ? process.env.CLIENT_URL
                 : "http://localhost:3000",
         credentials: true,

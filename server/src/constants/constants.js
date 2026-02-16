@@ -3,13 +3,13 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
 const JWT_SECRET =
-    process.env.ENVIRONMENT === "production"
+    process.env.NODE_ENV === "production"
         ? process.env.JWT_SECRET
         : "secret";
 const SALT_ROUNDS =
-    process.env.ENVIRONMENT === "production" ? Number(process.env.SALT_ROUNDS) : 10;
+    process.env.NODE_ENV === "production" ? Number(process.env.SALT_ROUNDS) : 10;
 const EXPIREYTIME =
-    process.env.ENVIRONMENT === "production" ? process.env.EXPIREYTIME : "1h";
+    process.env.NODE_ENV === "production" ? process.env.EXPIREYTIME : "1h";
 
 export const hashPassword = async (password) => {
     return await bcrypt.hash(password, SALT_ROUNDS);
@@ -45,15 +45,15 @@ export const safeUser = (user) => {
 
 export const cookieOptions = {
     httpOnly: true,
-    secure: process.env.ENVIRONMENT === "production",
-    sameSite: process.env.ENVIRONMENT === "production" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge:  60 * 60 * 1000,
 };
 
 export const refreshCookieOptions = {
     httpOnly: true,
-    secure: process.env.ENVIRONMENT === "production",
-    sameSite: process.env.ENVIRONMENT === "production" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 30 * 24 * 60 * 60 * 1000,
 };
 

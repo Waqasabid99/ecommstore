@@ -1,3 +1,4 @@
+'use client';
 import { Package, Users, Award, TrendingUp, CheckCircle, ShoppingBag, Headphones, Shield } from 'lucide-react';
 
 const stats = [

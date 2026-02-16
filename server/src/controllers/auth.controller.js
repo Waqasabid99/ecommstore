@@ -64,7 +64,7 @@ const loginUser = async (req, res) => {
             });
         }
         if (user) {
-            const isPasswordValid = verifyPassword(password, user.password);
+            const isPasswordValid = await verifyPassword(password, user.password);
             if (!user || !isPasswordValid) {
                 return res.status(401).json({
                     success: false,
@@ -96,10 +96,10 @@ const loginUser = async (req, res) => {
         res.status(200)
             .cookie("accessToken", accessToken, {
                 httpOnly: true,
-                secure: process.env.ENVIRONMENT === "production" ? true : false,
+                secure: process.env.NODE_ENV === "production" ? true : false,
                 sameSite:
-                    process.env.ENVIRONMENT === "production" ? "none" : "lax",
-                maxAge: 1 * 60 * 1000,
+                    process.env.NODE_ENV === "production" ? "none" : "lax",
+                maxAge: 15 * 60 * 1000,
             })
             .cookie("refreshToken", rawRefreshToken, refreshCookieOptions)
             .json({

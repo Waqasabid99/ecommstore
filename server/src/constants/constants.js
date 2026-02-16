@@ -7,7 +7,7 @@ const JWT_SECRET =
         ? process.env.JWT_SECRET
         : "secret";
 const SALT_ROUNDS =
-    process.env.ENVIRONMENT === "production" ? process.env.SALT_ROUNDS : 10;
+    process.env.ENVIRONMENT === "production" ? Number(process.env.SALT_ROUNDS) : 10;
 const EXPIREYTIME =
     process.env.ENVIRONMENT === "production" ? process.env.EXPIREYTIME : "1h";
 

@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Search,
@@ -31,7 +30,7 @@ const Navbar = () => {
   const [categories, setCategories] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const { logout, checkAuth } = useAuthStore();
+  const { logout, isLoading } = useAuthStore();
   const { isAuthenticated, user } = useAuth();
 
   // Search states
@@ -43,7 +42,6 @@ const Navbar = () => {
   const searchRef = useRef(null);
 
   const { getCartItems, getCartSummary } = useCartStore();
-  const cart = useCartStore((state) => state.cart);
   const { itemCount, subtotal } = getCartSummary();
 
   const cartItems = getCartItems();
@@ -133,10 +131,6 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
     const fetchCategories = async () => {
       const data = await getCategories();
       setCategories(data);
@@ -165,9 +159,15 @@ const Navbar = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    setOpenProfileDropDown(false);
-    router.push("/");
+    try {
+      await logout();
+      router.push("/");
+      router.refresh();
+      setOpenProfileDropDown(false);
+    } catch (error) {
+      setOpenProfileDropDown(false);
+      console.error("Logout error:", error);
+    }
   };
 
   const handleSearchSubmit = (e) => {
@@ -485,7 +485,7 @@ const Navbar = () => {
                             className="w-full flex items-center gap-3 px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors"
                           >
                             <LogOut size={18} />
-                            <span className="font-medium text-sm">Logout</span>
+                            <span className="font-medium text-sm">{isLoading ? "Logging out..." : "Logout"}</span>
                           </button>
                         </div>
                       </div>

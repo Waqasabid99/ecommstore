@@ -82,6 +82,7 @@ const AdminNavbar = () => {
                 </button>
 
                 {/* Cart */}
+                {isAdminPage ? null : (
                 <div className="relative">
                   <button
                     onClick={() => {
@@ -164,7 +165,7 @@ const AdminNavbar = () => {
                     </>
                   )}
                 </div>
-
+                )}
                 {/* User Profile */}
                 {isAuthenticated ? (
                   <div className="relative">

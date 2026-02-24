@@ -2,7 +2,7 @@
 import Stats from "@/components/ui/Stats";
 import Table from "@/components/ui/Table";
 import useAuthStore from "@/store/authStore";
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ShoppingCart,
   CheckCircle,
@@ -31,6 +31,7 @@ const Dashboard = ({ data: orders }) => {
   const { user } = useAuthStore();
   const navigate = useRouter();
   const [userOrders, setUserOrders] = useState([]);
+
   const statsWithIcons = stats.map((stat) => ({
     ...stat,
     icon: statIcons[stat.label] || null,
@@ -40,9 +41,11 @@ const Dashboard = ({ data: orders }) => {
     ...order,
     createdAt: formatDate(order.createdAt),
   }));
+
   const handleView = (item) => {
     navigate.push(`/user/${user.id}/orders/${item.id}`);
   };
+
   useEffect(() => {
     setUserOrders(orders);
   }, [orders]);
@@ -64,7 +67,7 @@ const Dashboard = ({ data: orders }) => {
       <h2 className="text-xl my-3.5">Your Latest Orders</h2>
       <Table
         columns={columns}
-        data={updatedData}
+        data={updatedData || []}
         actions={(item) => (
           <button
             className="p-2 hover:bg-black hover:text-white hover:rounded hover:p-2"

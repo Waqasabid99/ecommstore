@@ -2,7 +2,7 @@
 import DashboardHeadingBox from "@/components/ui/DashboardHeadingBox";
 import Table from "@/components/ui/Table";
 import { columns, formatDate } from "@/lib/utils";
-import { Eye, View } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
 const Orders = ({ orders }) => {

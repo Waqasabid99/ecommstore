@@ -1,4 +1,3 @@
-import { getCurrentUser } from "@/actions/user.action";
 import AdminNavbar from "@/components/layout/AdminNavbar";
 import Sidebar from "@/components/layout/Sidebar";
 import CheckAuth from "@/lib/AuthCheck";

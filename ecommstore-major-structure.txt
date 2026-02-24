@@ -1,0 +1,73 @@
+ecommstore
+├── .gitignore
+├── README.md
+├── components.json
+├── eslint.config.mjs
+├── jsconfig.json
+├── next.config.mjs
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── public
+│   ├── empty.png
+│   ├── error.jpg
+│   ├── error.lottie
+│   ├── facebook.svg
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── hero-banner.svg
+│   ├── instagram.svg
+│   ├── laptop.jpg
+│   ├── loading.lottie
+│   ├── next.svg
+│   ├── placeholder.png
+│   ├── vercel.svg
+│   ├── vite.svg
+│   ├── window.svg
+│   ├── x.svg
+│   └── youtube.svg
+├── src
+│   ├── .env
+│   ├── actions
+│   │   ├── category.action.js
+│   │   └── user.action.js
+│   ├── app
+│   │   ├── (admin)
+│   │   ├── (auth)
+│   │   ├── (main)
+│   │   ├── (user)
+│   │   ├── error.jsx
+│   │   ├── favicon.ico
+│   │   ├── global-error.jsx
+│   │   ├── globals.css
+│   │   ├── layout.js
+│   │   ├── loading.jsx
+│   │   ├── middleware.js
+│   │   └── not-found.jsx
+│   ├── components
+│   │   ├── BlogPage
+│   │   ├── HomePage
+│   │   ├── Transitions
+│   │   ├── admin
+│   │   ├── category
+│   │   ├── layout
+│   │   ├── pages
+│   │   ├── product
+│   │   ├── ui
+│   │   └── userDashboard
+│   ├── hooks
+│   │   ├── ShowToast.jsx
+│   │   ├── useAuth.jsx
+│   │   └── useCart.jsx
+│   ├── lib
+│   │   ├── AuthCheck.jsx
+│   │   ├── CartInitializer.jsx
+│   │   ├── api
+│   │   ├── seo.js
+│   │   └── utils.js
+│   └── store
+│       ├── authStore.jsx
+│       └── useCartStore.jsx
+└── tailwind.config.ts
+
+24 directories, 47 files

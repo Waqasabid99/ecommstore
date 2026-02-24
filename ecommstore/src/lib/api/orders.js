@@ -34,3 +34,17 @@ export const adminOrders = async () => {
     throw new Error("Failed to fetch admin orders");
   }
 }
+
+export const getStats = async () => {
+  try {
+    const cookieStore = await cookies();
+    const res = await fetch(`${baseUrl}/dashboard/stats`, {
+      headers: {
+        Cookie: cookieStore.toString(),
+      },
+    });
+    return res.json();
+  } catch (err) {
+    throw new Error("Failed to fetch stats");
+  }
+}

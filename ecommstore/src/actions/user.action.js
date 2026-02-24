@@ -2,11 +2,12 @@ import { baseUrl } from "@/lib/utils";
 import axios from "axios";
 import { cookies } from "next/headers";
 
-export const getCurrentUser = async (id) => {
+export const getCurrentUser = async () => {
   try {
     const cookieStore = await cookies();
 
-    const { data } = await axios.get(`${baseUrl}/users/${id}`, {
+    // Use the /auth/verify endpoint — it reads the cookie to identify the user
+    const { data } = await axios.get(`${baseUrl}/auth/verify`, {
       headers: {
         Cookie: cookieStore.toString(),
       },
@@ -17,7 +18,7 @@ export const getCurrentUser = async (id) => {
       return null;
     }
 
-    return data.data;
+    return data.user;
   } catch (err) {
     return null;
   }

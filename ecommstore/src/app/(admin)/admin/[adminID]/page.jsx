@@ -1,9 +1,8 @@
 import Dashboard from "@/components/admin/pages/Dashboard"
-import { adminOrders } from "@/lib/api/adminOrders";
+import { adminOrders } from "@/lib/api/orders";
 import { getStats } from "@/lib/api/stat";
 
 const page = async () => {
-  setTimeout(() => {}, 100);
     const {data: orders, pagination} = await adminOrders();
     const {data: stat} = await getStats();
   return (

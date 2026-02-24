@@ -1,6 +1,7 @@
 import { baseUrl } from "../utils";
 import { cookies } from "next/headers";
 export const adminOrders = async () => {
+
   const cookieStore = await cookies();
   const res = await fetch(`${baseUrl}/orders`, {
     headers: {

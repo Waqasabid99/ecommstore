@@ -19,3 +19,18 @@ export const getOrders = async () => {
     const data = await res.json();
     return data;
 }
+
+export const adminOrders = async () => {
+  try {
+    const cookieStore = await cookies();
+    const res = await fetch(`${baseUrl}/orders`, {
+      headers: {
+        Cookie: cookieStore.toString(),
+      },
+    });
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    throw new Error("Failed to fetch admin orders");
+  }
+}

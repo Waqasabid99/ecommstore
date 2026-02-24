@@ -17,8 +17,8 @@ export const getCurrentUser = async () => {
     if (!data?.success) {
       return null;
     }
-
-    return data.user;
+    console.log(data.data)
+    return data.data;
   } catch (err) {
     return null;
   }

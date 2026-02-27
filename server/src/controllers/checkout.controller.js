@@ -57,7 +57,7 @@ const initiateCheckout = async (req, res) => {
                         coupon: true,
                     },
                 });
-
+                console.log(cart)
                 if (!cart || cart.items.length === 0) {
                     throw new Error("Cart is empty");
                 }

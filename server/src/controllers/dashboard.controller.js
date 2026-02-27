@@ -83,7 +83,16 @@ const getStatsOverview = async (req, res) => {
         },
       });
 
-      // 4. Total products sold
+      const totalUsers = await tx.user.count({
+        where: {
+          deletedAt: null,
+        },
+      });
+
+      // 4. Total products
+      const totalProducts = await tx.product.count({ where: { deletedAt: null } });
+
+      // 5. Total products sold
       const productsSold = await tx.orderItem.aggregate({
         where: {
           order: {
@@ -95,7 +104,7 @@ const getStatsOverview = async (req, res) => {
         _sum: { quantity: true },
       });
 
-      // 5. Pending orders (current, not time-bound)
+      // 6. Pending orders (current, not time-bound)
       const pendingOrders = await tx.order.count({
         where: {
           status: { in: ["PENDING", "AWAITING_PAYMENT"] },
@@ -103,7 +112,7 @@ const getStatsOverview = async (req, res) => {
         },
       });
 
-      // 6. Inventory alerts
+      // 7. Inventory alerts
       const lowStockCount = await tx.inventory.count({
         where: {
           quantity: { lte: 10, gt: 0 },
@@ -130,11 +139,11 @@ const getStatsOverview = async (req, res) => {
           orderCount: revenueStats._count.id,
         },
         customers: {
-          active: customerStats.length,
+          total: totalUsers,
           new: newCustomers,
-          totalUsers: customerStats.reduce((sum, s) => sum + s._count.userId, 0),
         },
         products: {
+          totalProducts,
           sold: productsSold._sum.quantity || 0,
         },
         orders: {

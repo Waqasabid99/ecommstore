@@ -272,7 +272,7 @@ const Navbar = () => {
                 <select 
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="absolute left-0 top-0 h-full px-4 pr-8 bg-black text-white rounded-l-full text-sm font-medium border-none outline-none appearance-none cursor-pointer hover:bg-gray-900 transition-colors z-10"
+                  className="absolute left-0 top-0 h-full px-4 pr-8 bg-black text-white rounded-l-full text-sm font-medium border-none outline-none appearance-none cursor-pointer hover:bg-gray-900 transition-colors z-10 max-w-1/4"
                 >
                   <option value="">All Categories</option>
                   {renderCategories(categories)}

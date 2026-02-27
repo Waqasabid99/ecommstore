@@ -53,7 +53,7 @@ const Dashboard = () => {
     };
     fetchAll();
   }, []);
-
+console.log(orders, stats)
   const chartData = chartDistributionData?.map((item) => ({
     name: item.status,
     value: item.count,
@@ -65,6 +65,7 @@ const Dashboard = () => {
     PENDING: "#facc15",
     PAID: "#22c55e",
     DELIVERED: "#3b82f6",
+    CANCELLED: "#ef4444",
   };
 
   const updatedOrders = orders?.map((order) => ({
@@ -135,12 +136,11 @@ const Dashboard = () => {
         text={`Welcome back, ${user?.userName || "Guest"} 👋`}
       />
 
-
       <Stats
         stats={[
           {
             label: "Total Users",
-            value: stats?.customers?.totalUsers || 0,
+            value: stats?.customers?.total || 0,
             icon: <Users size={32} />,
           },
           {

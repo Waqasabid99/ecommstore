@@ -8,12 +8,12 @@ import axios from "axios";
 import { Clock, DollarSign, Eye, PackageX, ShoppingCart, SquarePen, Users } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { 
-  Cell, 
-  Pie, 
-  PieChart, 
-  ResponsiveContainer, 
-  Tooltip, 
+import {
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   Legend,
   BarChart,
   Bar,
@@ -23,29 +23,38 @@ import {
 } from "recharts";
 
 
-const Dashboard = ({ stats, orders, pagination }) => {
+const Dashboard = () => {
   const { user } = useAuthStore();
   const { adminID } = useParams();
   const navigate = useRouter();
   const [chartDistributionData, setChartDistributionData] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch orders, stats, and chart data client-side (browser sends cookies directly to Express)
   useEffect(() => {
-    try {
-      const getChartData = async () => {
-        const { data } = await axios.get(`${baseUrl}/dashboard/order-status`, {
-          withCredentials: true,
-        });
-        if (data.success) {
-          setChartDistributionData(data.data.distribution);
-        }
-      };
-      getChartData();
-    } catch (error) {
-      console.log(error);
-    }
+    const fetchAll = async () => {
+      setIsLoading(true);
+      try {
+        const [ordersRes, statsRes, chartRes] = await Promise.all([
+          axios.get(`${baseUrl}/orders`, { withCredentials: true }),
+          axios.get(`${baseUrl}/dashboard/stats`, { withCredentials: true }),
+          axios.get(`${baseUrl}/dashboard/order-status`, { withCredentials: true }),
+        ]);
+        if (ordersRes.data.success) setOrders(ordersRes.data.data);
+        if (statsRes.data.success) setStats(statsRes.data.data);
+        if (chartRes.data.success) setChartDistributionData(chartRes.data.data.distribution);
+      } catch (error) {
+        console.error('Dashboard fetch error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAll();
   }, []);
 
-  const chartData = chartDistributionData.map((item) => ({
+  const chartData = chartDistributionData?.map((item) => ({
     name: item.status,
     value: item.count,
     revenue: Number(item.revenue),
@@ -58,7 +67,7 @@ const Dashboard = ({ stats, orders, pagination }) => {
     DELIVERED: "#3b82f6",
   };
 
-  const updatedOrders = orders.map((order) => ({
+  const updatedOrders = orders?.map((order) => ({
     ...order,
     createdAt: formatDate(order.createdAt),
   }));
@@ -109,12 +118,24 @@ const Dashboard = ({ stats, orders, pagination }) => {
     return null;
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section>
       <DashboardHeadingBox
         text={`Welcome back, ${user?.userName || "Guest"} 👋`}
       />
-      
+
+
       <Stats
         stats={[
           {
@@ -173,18 +194,18 @@ const Dashboard = ({ stats, orders, pagination }) => {
                 label={renderCustomLabel}
                 labelLine={false}
               >
-                {chartData.map((entry) => (
-                  <Cell 
-                    key={entry.name} 
-                    fill={COLORS[entry.name]} 
+                {chartData?.map((entry) => (
+                  <Cell
+                    key={entry.name}
+                    fill={COLORS[entry.name]}
                     stroke="#fff"
                     strokeWidth={2}
                   />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
-              <Legend 
-                verticalAlign="bottom" 
+              <Legend
+                verticalAlign="bottom"
                 height={36}
                 iconType="circle"
                 formatter={(value) => (
@@ -203,12 +224,12 @@ const Dashboard = ({ stats, orders, pagination }) => {
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="name" 
+              <XAxis
+                dataKey="name"
                 tick={{ fill: '#6b7280', fontSize: 12 }}
                 axisLine={{ stroke: '#e5e7eb' }}
               />
-              <YAxis 
+              <YAxis
                 tick={{ fill: '#6b7280', fontSize: 12 }}
                 axisLine={{ stroke: '#e5e7eb' }}
                 tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
@@ -223,12 +244,12 @@ const Dashboard = ({ stats, orders, pagination }) => {
                 formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
                 labelStyle={{ color: '#374151', fontWeight: 'bold' }}
               />
-              <Bar 
-                dataKey="revenue" 
+              <Bar
+                dataKey="revenue"
                 radius={[8, 8, 0, 0]}
                 maxBarSize={80}
               >
-                {chartData.map((entry) => (
+                {chartData?.map((entry) => (
                   <Cell key={entry.name} fill={COLORS[entry.name]} />
                 ))}
               </Bar>

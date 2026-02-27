@@ -1,14 +1,14 @@
-import { baseUrl } from "../utils";
 import { cookies } from "next/headers";
-export const adminOrders = async () => {
+import { baseUrl } from "../utils";
 
+export const adminOrders = async () => {
   const cookieStore = await cookies();
+  const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
   const res = await fetch(`${baseUrl}/orders`, {
     headers: {
-      Cookie: cookieStore.toString(),
+      Cookie: cookieString,
     },
   });
-  console.log(res);
   if (!res.ok) {
     throw new Error("Failed to fetch orders");
   }

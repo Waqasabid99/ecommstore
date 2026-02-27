@@ -11,10 +11,12 @@ import {
   DollarSign,
   TrendingUp,
   Eye,
+  LoaderIcon,
 } from "lucide-react";
-import { columns, formatDate } from "@/lib/utils";
+import { baseUrl, columns, formatDate } from "@/lib/utils";
 import DashboardHeadingBox from "@/components/ui/DashboardHeadingBox";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 const statIcons = {
   "Total Orders": <ShoppingCart className="w-6 h-6" />,
@@ -26,18 +28,56 @@ const statIcons = {
   "Average Order Value": <TrendingUp className="w-6 h-6" />,
 };
 
-const Dashboard = ({ data: orders }) => {
-  const { stats } = orders;
+const Dashboard = () => {
   const { user } = useAuthStore();
   const navigate = useRouter();
-  const [userOrders, setUserOrders] = useState([]);
+  const [orders, setOrders] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const statsWithIcons = stats.map((stat) => ({
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setIsLoading(true);
+      try {
+        const { data } = await axios.get(`${baseUrl}/orders/user`, {
+          withCredentials: true,
+        });
+        if (data.success) {
+          setOrders(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user orders:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <LoaderIcon size={48} className="animate-spin mx-auto mb-4 text-black" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!orders) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-gray-500">Could not load your orders. Please try again.</p>
+      </div>
+    );
+  }
+
+  const statsWithIcons = (orders.stats || []).map((stat) => ({
     ...stat,
     icon: statIcons[stat.label] || null,
   }));
 
-  const updatedData = orders.data.map((order) => ({
+  const updatedData = (orders.data || []).map((order) => ({
     ...order,
     createdAt: formatDate(order.createdAt),
   }));
@@ -45,10 +85,6 @@ const Dashboard = ({ data: orders }) => {
   const handleView = (item) => {
     navigate.push(`/user/${user.id}/orders/${item.id}`);
   };
-
-  useEffect(() => {
-    setUserOrders(orders);
-  }, [orders]);
 
   return (
     <div>

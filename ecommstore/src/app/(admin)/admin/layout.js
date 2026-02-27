@@ -1,6 +1,6 @@
 import AdminNavbar from "@/components/layout/AdminNavbar";
 import Sidebar from "@/components/layout/Sidebar";
-import CheckAuth from "@/lib/AuthCheck";
+import AdminGuard from "@/lib/AdminGuard";
 
 export const metadata = {
   title: "Admin - EcomStore",
@@ -11,17 +11,17 @@ export const metadata = {
 export default async function AdminLayout({ children }) {
 
   return (
-   <div className="min-h-screen bg-(--bg-page)">
-    <CheckAuth>
-    <AdminNavbar />
-      <Sidebar />
-      {/* Main Content Area */}
-      <main className="lg:ml-72 min-h-screen">
-        <div className="p-6 lg:p-8">
-          {children}
-        </div>
-      </main>
-    </CheckAuth>
+    <div className="min-h-screen bg-(--bg-page)">
+      <AdminGuard>
+        <AdminNavbar />
+        <Sidebar />
+        {/* Main Content Area */}
+        <main className="lg:ml-72 min-h-screen">
+          <div className="p-6 lg:p-8">
+            {children}
+          </div>
+        </main>
+      </AdminGuard>
     </div>
   );
 }

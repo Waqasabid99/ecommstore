@@ -8,14 +8,15 @@ import { cookies } from 'next/headers';
 
 
 export async function createCategoryAction(formData) {
-    const cookieStore = await cookies();
+  const cookieStore = await cookies();
+  const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
 
   const { data } = await axios.post(
     `${baseUrl}/categories/create`,
     formData,
     {
       headers: {
-        Cookie: cookieStore.toString(),
+        Cookie: cookieString,
       },
     }
   );
@@ -30,13 +31,14 @@ export async function createCategoryAction(formData) {
 }
 
 export async function fetchCategoryById(categoryID) {
-    const cookieStore = await cookies();
-  const {data} = await axios.get(`${baseUrl}/categories/${categoryID}` , {
+  const cookieStore = await cookies();
+  const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
+  const { data } = await axios.get(`${baseUrl}/categories/${categoryID}`, {
     headers: {
-      Cookie: cookieStore.toString(),
+      Cookie: cookieString,
     }
-  } );
-  
+  });
+
   if (!data.success) {
     throw new Error('Failed to fetch category');
   }
@@ -46,13 +48,14 @@ export async function fetchCategoryById(categoryID) {
 }
 
 export async function updateCategoryAction(formData) {
-    const cookieStore = await cookies();
+  const cookieStore = await cookies();
+  const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
   const { data } = await axios.patch(
     `${baseUrl}/categories/update/${formData.id}`,
     formData,
     {
       headers: {
-        Cookie: cookieStore.toString(),
+        Cookie: cookieString,
       },
     }
   );
@@ -67,12 +70,13 @@ export async function updateCategoryAction(formData) {
 }
 
 export async function deleteCategoryAction(id) {
-    const cookieStore = await cookies();
+  const cookieStore = await cookies();
+  const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
   const { data } = await axios.delete(
     `${baseUrl}/categories/delete/${id}`,
     {
       headers: {
-        Cookie: cookieStore.toString(),
+        Cookie: cookieString,
       },
     }
   );

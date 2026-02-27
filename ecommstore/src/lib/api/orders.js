@@ -2,30 +2,32 @@ import { cookies } from "next/headers"
 import { baseUrl } from "../utils";
 
 export const getOrders = async () => {
-    const cookieStore = await cookies();
-    const res = await fetch(`${baseUrl}/orders/user`, {
-      headers: {
-        Cookie: cookieStore.toString(),
-      },
-      next: {
-        revalidate: 60,
-      },
-     cache: "no-cache",
-    });
-    console.log(res)
-    if (!res.ok) {
-      throw new Error("Failed to fetch orders");
-    }
-    const data = await res.json();
-    return data;
+  const cookieStore = await cookies();
+  const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
+  const res = await fetch(`${baseUrl}/orders/user`, {
+    headers: {
+      Cookie: cookieString,
+    },
+    next: {
+      revalidate: 60,
+    },
+    cache: "no-cache",
+  });
+  console.log(res)
+  if (!res.ok) {
+    throw new Error("Failed to fetch orders");
+  }
+  const data = await res.json();
+  return data;
 }
 
 export const adminOrders = async () => {
   try {
     const cookieStore = await cookies();
+    const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
     const res = await fetch(`${baseUrl}/orders`, {
       headers: {
-        Cookie: cookieStore.toString(),
+        Cookie: cookieString,
       },
     });
     const data = await res.json();
@@ -38,9 +40,10 @@ export const adminOrders = async () => {
 export const getStats = async () => {
   try {
     const cookieStore = await cookies();
+    const cookieString = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
     const res = await fetch(`${baseUrl}/dashboard/stats`, {
       headers: {
-        Cookie: cookieStore.toString(),
+        Cookie: cookieString,
       },
     });
     return res.json();

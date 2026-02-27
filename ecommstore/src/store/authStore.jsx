@@ -28,11 +28,7 @@ const useAuthStore = create(
 
           // Get fresh cart store instance and merge with explicit user context
           const cartStore = useCartStore.getState();
-          
-          // Small delay to ensure persist middleware writes to storage
-          // OR better: manually trigger the merge with user context
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
+       
           await cartStore.mergeGuestCart(data.user);
           await cartStore.initializeCart();
 
@@ -66,10 +62,7 @@ const useAuthStore = create(
 
           // Get fresh cart store instance
           const cartStore = useCartStore.getState();
-          
-          // Small delay to ensure persist middleware writes to storage
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
+
           await cartStore.mergeGuestCart(data.user);
           await cartStore.initializeCart();
 

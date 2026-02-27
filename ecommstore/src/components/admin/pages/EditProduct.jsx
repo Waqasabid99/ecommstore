@@ -29,6 +29,9 @@ const EditProduct = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState([]);
 
+  // Tag chip state
+  const [tagInput, setTagInput] = useState("");
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -115,6 +118,37 @@ const EditProduct = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Recursively flatten nested categories into a flat list with depth for indentation
+  const flattenCategories = (items, depth = 0) => {
+    return items.reduce((acc, cat) => {
+      acc.push({ ...cat, depth });
+      if (cat.children?.length) {
+        acc.push(...flattenCategories(cat.children, depth + 1));
+      }
+      return acc;
+    }, []);
+  };
+
+  const flatCategories = flattenCategories(categories);
+
+  // Tag chip handlers
+  const handleTagKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const newTag = tagInput.trim().replace(/,$/, "");
+      if (newTag && !formData.tag.includes(newTag)) {
+        setFormData((prev) => ({ ...prev, tag: [...prev.tag, newTag] }));
+      }
+      setTagInput("");
+    } else if (e.key === "Backspace" && !tagInput && formData.tag.length) {
+      setFormData((prev) => ({ ...prev, tag: prev.tag.slice(0, -1) }));
+    }
+  };
+
+  const handleRemoveTag = (index) => {
+    setFormData((prev) => ({ ...prev, tag: prev.tag.filter((_, i) => i !== index) }));
   };
 
   const handleInputChange = (e) => {
@@ -347,17 +381,10 @@ const EditProduct = () => {
                 required
               >
                 <option value="">Select category</option>
-                {categories.map((category) => (
-                  <>
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                    {category.children.map((child) => (
-                      <option key={child.id} value={child.id}>
-                        {child.name}
-                      </option>
-                    ))}
-                  </>
+                {flatCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {"\u00a0\u00a0".repeat(cat.depth * 2)}{cat.depth > 0 ? "└ " : ""}{cat.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -378,24 +405,49 @@ const EditProduct = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tag
+                Tags
               </label>
-              <input
-                type="text"
-                name="tag"
-                value={formData.tag.join(", ")}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    tag: e.target.value
-                      .split(",")
-                      .map((t) => t.trim())
-                      .filter(Boolean),
-                  }))
-                }
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black transition-colors"
-                placeholder="e.g., New, Sale, Featured"
-              />
+              {/* Tag chip input */}
+              <div
+                className="w-full min-h-[48px] px-3 py-2 border border-gray-300 rounded-lg focus-within:border-black transition-colors flex flex-wrap gap-2 items-center cursor-text"
+                onClick={() => document.getElementById('edit-tag-input').focus()}
+              >
+                {formData.tag.map((tag, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 bg-black text-white text-xs font-medium px-2.5 py-1 rounded-full"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(i)}
+                      className="hover:text-gray-300 leading-none"
+                      aria-label={`Remove tag ${tag}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id="edit-tag-input"
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  onBlur={() => {
+                    const newTag = tagInput.trim();
+                    if (newTag && !formData.tag.includes(newTag)) {
+                      setFormData((prev) => ({ ...prev, tag: [...prev.tag, newTag] }));
+                    }
+                    setTagInput("");
+                  }}
+                  className="flex-1 min-w-[120px] outline-none bg-transparent text-sm py-0.5"
+                  placeholder={formData.tag.length === 0 ? "Type a tag and press Enter or comma" : "Add more..."}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Press <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs">Enter</kbd> or <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs">,</kbd> to add a tag
+              </p>
             </div>
 
             <div className="md:col-span-2">
@@ -523,29 +575,29 @@ const EditProduct = () => {
                         <div className="flex gap-2">
                           <input
                             type="text"
-  value={variant.attributesText}
-                      onChange={(e) => {
-                        const value = e.target.value;
+                            value={variant.attributesText}
+                            onChange={(e) => {
+                              const value = e.target.value;
 
-                        setVariants((prev) =>
-                          prev.map((v, i) => {
-                            if (i !== index) return v;
+                              setVariants((prev) =>
+                                prev.map((v, i) => {
+                                  if (i !== index) return v;
 
-                            let parsed = null;
-                            try {
-                              parsed = value ? JSON.parse(value) : null;
-                            } catch {
-                              
-                            }
+                                  let parsed = null;
+                                  try {
+                                    parsed = value ? JSON.parse(value) : null;
+                                  } catch {
 
-                            return {
-                              ...v,
-                              attributesText: value, // ALWAYS update text
-                              attributes: parsed, // update only if valid
-                            };
-                          }),
-                        );
-                      }}
+                                  }
+
+                                  return {
+                                    ...v,
+                                    attributesText: value, // ALWAYS update text
+                                    attributes: parsed, // update only if valid
+                                  };
+                                }),
+                              );
+                            }}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
                             placeholder='{"size":"M"}'
                           />

@@ -2,7 +2,7 @@ import Image from "next/image";
 import ProductCard from "../product/ProductCard";
 import ProductCardSkeleton from "../product/ProductCardSkeleton";
 
-const Products = ({ products, isEmpty }) => {
+const Products = ({ products, isEmpty, getProducts }) => {
   // Show loading skeletons if products is null/undefined
   const loading = !products;
 

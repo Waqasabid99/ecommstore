@@ -22,7 +22,7 @@ const initiateCheckout = async (req, res) => {
             error: "Shipping address is required",
         });
     }
-
+    console.log("The userId is: ", userId);
     try {
         const result = await prisma.$transaction(
             async (tx) => {

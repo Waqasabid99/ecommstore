@@ -1,3 +1,4 @@
+'use server';
 import { cache } from "react";
 import { baseUrl } from "../utils";
 

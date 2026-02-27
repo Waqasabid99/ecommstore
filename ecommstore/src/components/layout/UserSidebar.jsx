@@ -5,20 +5,12 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { 
   Home, 
-  FolderTree, 
-  Package, 
-  FileText, 
-  Tag, 
-  Users, 
   ShoppingCart, 
   Settings,
   ChevronDown,
   ChevronRight,
   Menu,
   X,
-  Plus,
-  Edit,
-  ShoppingBag,
   Star,
   RefreshCcw,
   CircleDollarSign
@@ -39,11 +31,6 @@ const UserSidebar = () => {
     name: 'Orders',
     href: `/user/${id}/orders`,
     icon: <ShoppingCart className="w-5 h-5" />,
-  },
-  {
-    name: 'Shop',
-    href: `/user/${id}/shop`,
-    icon: <ShoppingBag className="w-5 h-5" />,
   },
   {
     name: 'Reviews',

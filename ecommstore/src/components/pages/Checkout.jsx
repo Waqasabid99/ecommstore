@@ -79,8 +79,8 @@ const AddressCard = ({
     className={cn(
       "relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200",
       selected
-        ? "border-[var(--color-brand-primary)] bg-blue-50/50 shadow-md"
-        : "border-[var(--border-default)] hover:border-[var(--color-brand-primary)] hover:shadow-sm"
+        ? "border-(--color-brand-primary) bg-blue-50/50 shadow-md"
+        : "border-(--border-default) hover:border-(--color-brand-primary) hover:shadow-sm"
     )}
   >
     <div className="flex items-start justify-between">
@@ -88,14 +88,14 @@ const AddressCard = ({
         <div
           className={cn(
             "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-            selected ? "bg-[var(--color-brand-primary)] text-white" : "bg-gray-100 text-gray-600"
+            selected ? "bg-(--color-brand-primary) text-white" : "bg-gray-100 text-gray-600"
           )}
         >
           {type === "shipping" ? <Home size={20} /> : <Briefcase size={20} />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-semibold text-[var(--text-heading)] truncate">
+            <h4 className="font-semibold text-(--text-heading) truncate">
               {address.fullName}
             </h4>
             {address.isDefault && (
@@ -104,15 +104,15 @@ const AddressCard = ({
               </span>
             )}
           </div>
-          <p className="text-sm text-[var(--text-secondary)] mb-1">{address.phone}</p>
-          <p className="text-sm text-[var(--text-secondary)] line-clamp-2">
+          <p className="text-sm text-(--text-secondary) mb-1">{address.phone}</p>
+          <p className="text-sm text-(--text-secondary) line-clamp-2">
             {address.line1}
             {address.line2 && `, ${address.line2}`}
           </p>
-          <p className="text-sm text-[var(--text-secondary)]">
+          <p className="text-sm text-(--text-secondary)">
             {address.city}, {address.state}, {address.postalCode}
           </p>
-          <p className="text-sm text-[var(--text-secondary)] font-medium mt-1">
+          <p className="text-sm text-(--text-secondary) font-medium mt-1">
             {Country.getCountryByCode(address.country)?.name || address.country}
           </p>
         </div>
@@ -124,7 +124,7 @@ const AddressCard = ({
             e.stopPropagation();
             onEdit();
           }}
-          className="p-2 text-gray-400 hover:text-[var(--color-brand-primary)] hover:bg-blue-50 rounded-lg transition-colors"
+          className="p-2 text-gray-400 hover:text-(--color-brand-primary) hover:bg-blue-50 rounded-lg transition-colors"
           title="Edit address"
         >
           <Edit2 size={16} />
@@ -145,7 +145,7 @@ const AddressCard = ({
     </div>
     
     {selected && (
-      <div className="absolute top-4 right-4 w-6 h-6 bg-[var(--color-brand-primary)] text-white rounded-full flex items-center justify-center">
+      <div className="absolute top-4 right-4 w-6 h-6 bg-(--color-brand-primary) text-white rounded-full flex items-center justify-center">
         <CheckCircle size={16} />
       </div>
     )}
@@ -169,7 +169,7 @@ const AddressForm = ({
     <div className="space-y-4">
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             Full Name *
           </label>
           <input
@@ -181,7 +181,7 @@ const AddressForm = ({
               "w-full px-4 py-3 border rounded-lg focus:outline-none transition-colors",
               errors.fullName
                 ? "border-red-500 focus:border-red-500"
-                : "border-[var(--border-default)] focus:border-[var(--color-brand-primary)]"
+                : "border-(--border-default) focus:border-(--color-brand-primary)"
             )}
             placeholder="John Doe"
           />
@@ -191,7 +191,7 @@ const AddressForm = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             Phone Number *
           </label>
           <PhoneInput
@@ -223,7 +223,7 @@ const AddressForm = ({
 
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             Address Line 1 *
           </label>
           <input
@@ -235,7 +235,7 @@ const AddressForm = ({
               "w-full px-4 py-3 border rounded-lg focus:outline-none transition-colors",
               errors.line1
                 ? "border-red-500 focus:border-red-500"
-                : "border-[var(--border-default)] focus:border-[var(--color-brand-primary)]"
+                : "border-(--border-default) focus:border-(--color-brand-primary)"
             )}
             placeholder="123 Main Street"
           />
@@ -245,16 +245,16 @@ const AddressForm = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             Address Line 2
-            <span className="text-[var(--text-secondary)] font-normal ml-1">(Optional)</span>
+            <span className="text-(--text-secondary) font-normal ml-1">(Optional)</span>
           </label>
           <input
             type="text"
             value={data.line2}
             onChange={(e) => onChange("line2", e.target.value)}
             disabled={disabled}
-            className="w-full px-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors"
+            className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
             placeholder="Apartment, suite, building, floor, etc."
           />
         </div>
@@ -262,7 +262,7 @@ const AddressForm = ({
 
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             Country *
           </label>
           <Select
@@ -283,7 +283,7 @@ const AddressForm = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             State / Province *
           </label>
           <Select
@@ -306,7 +306,7 @@ const AddressForm = ({
 
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             City *
           </label>
           <Select
@@ -327,16 +327,16 @@ const AddressForm = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+          <label className="block text-sm font-medium text-(--text-heading) mb-2">
             Postal Code
-            <span className="text-[var(--text-secondary)] font-normal ml-1">(Optional)</span>
+            <span className="text-(--text-secondary) font-normal ml-1">(Optional)</span>
           </label>
           <input
             type="text"
             value={data.postalCode}
             onChange={(e) => onChange("postalCode", e.target.value)}
             disabled={disabled}
-            className="w-full px-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors"
+            className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
             placeholder="12345"
           />
         </div>
@@ -833,17 +833,17 @@ const Checkout = () => {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="bg-white border border-[var(--border-default)] rounded-2xl p-6 md:p-8 shadow-sm"
+      className="bg-white border border-(--border-default) rounded-2xl p-6 md:p-8 shadow-sm"
     >
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-[var(--color-brand-primary)] rounded-full flex items-center justify-center">
+        <div className="w-12 h-12 bg-(--color-brand-primary) rounded-full flex items-center justify-center">
           <Truck size={24} className="text-white" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-[var(--text-heading)]">
+          <h2 className="text-2xl font-bold text-(--text-heading)">
             Shipping Information
           </h2>
-          <p className="text-sm text-[var(--text-secondary)]">
+          <p className="text-sm text-(--text-secondary)">
             {isAuthenticated
               ? "Select a saved address or add a new one"
               : "Sign in to use saved addresses"}
@@ -853,8 +853,8 @@ const Checkout = () => {
 
       {/* Auth Section for non-authenticated users */}
       {!isAuthenticated && (
-        <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-[var(--border-default)]">
-          <h3 className="text-lg font-semibold mb-4 text-[var(--text-heading)]">
+        <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-(--border-default)">
+          <h3 className="text-lg font-semibold mb-4 text-(--text-heading)">
             {hasAccount ? "Welcome Back" : "Create Account"}
           </h3>
           
@@ -868,7 +868,7 @@ const Checkout = () => {
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+                <label className="block text-sm font-medium text-(--text-heading) mb-2">
                   Email Address *
                 </label>
                 <div className="relative">
@@ -878,14 +878,14 @@ const Checkout = () => {
                     value={formData.shipping.email}
                     onChange={(e) => handleShippingChange("email", e.target.value)}
                     required
-                    className="w-full pl-10 pr-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors"
+                    className="w-full pl-10 pr-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
                     placeholder="john@example.com"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+                <label className="block text-sm font-medium text-(--text-heading) mb-2">
                   Password *
                 </label>
                 <div className="relative">
@@ -902,7 +902,7 @@ const Checkout = () => {
                     value={formData.shipping.password}
                     onChange={(e) => handleShippingChange("password", e.target.value)}
                     required
-                    className="w-full pl-10 pr-10 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors"
+                    className="w-full pl-10 pr-10 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
                     placeholder="••••••••"
                   />
                 </div>
@@ -911,7 +911,7 @@ const Checkout = () => {
 
             {!hasAccount && (
               <div>
-                <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+                <label className="block text-sm font-medium text-(--text-heading) mb-2">
                   Full Name *
                 </label>
                 <div className="relative">
@@ -921,7 +921,7 @@ const Checkout = () => {
                     value={formData.shipping.fullName}
                     onChange={(e) => handleShippingChange("fullName", e.target.value)}
                     required
-                    className="w-full pl-10 pr-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors"
+                    className="w-full pl-10 pr-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
                     placeholder="John Doe"
                   />
                 </div>
@@ -936,7 +936,7 @@ const Checkout = () => {
                   setAuthError("");
                   clearError();
                 }}
-                className="text-[var(--color-brand-primary)] font-medium hover:underline text-sm"
+                className="text-(--color-brand-primary) font-medium hover:underline text-sm"
               >
                 {hasAccount ? "Don't have an account? Register" : "Already have an account? Login"}
               </button>
@@ -944,7 +944,7 @@ const Checkout = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="bg-[var(--color-brand-primary)] text-white px-8 py-3 rounded-full hover:opacity-90 transition-all font-medium disabled:opacity-50 flex items-center gap-2"
+                className="bg-(--color-brand-primary) text-white px-8 py-3 rounded-full hover:opacity-90 transition-all font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {isLoading ? <Loader2 size={20} className="animate-spin" /> : null}
                 {hasAccount ? "Sign In" : "Create Account"}
@@ -960,12 +960,12 @@ const Checkout = () => {
           {/* Saved Addresses */}
           {addressesLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={32} className="animate-spin text-[var(--color-brand-primary)]" />
+              <Loader2 size={32} className="animate-spin text-(--color-brand-primary)" />
             </div>
           ) : savedAddresses.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-[var(--text-heading)]">
+                <h3 className="text-lg font-semibold text-(--text-heading)">
                   Saved Addresses
                 </h3>
                 <button
@@ -993,7 +993,7 @@ const Checkout = () => {
                       setCityOptions([]);
                     }
                   }}
-                  className="text-sm text-[var(--color-brand-primary)] font-medium hover:underline flex items-center gap-1"
+                  className="text-sm text-(--color-brand-primary) font-medium hover:underline flex items-center gap-1"
                 >
                   <Plus size={16} />
                   {showNewShippingForm ? "Cancel" : "Add New Address"}
@@ -1017,13 +1017,13 @@ const Checkout = () => {
               )}
             </div>
           ) : (
-            <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-[var(--border-default)]">
+            <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-(--border-default)">
               <MapPin size={48} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-[var(--text-secondary)] mb-4">No saved addresses found</p>
+              <p className="text-(--text-secondary) mb-4">No saved addresses found</p>
               <button
                 type="button"
                 onClick={() => setShowNewShippingForm(true)}
-                className="text-[var(--color-brand-primary)] font-medium hover:underline"
+                className="text-(--color-brand-primary) font-medium hover:underline"
               >
                 Add your first address
               </button>
@@ -1039,8 +1039,8 @@ const Checkout = () => {
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="p-6 bg-gray-50 rounded-xl border border-[var(--border-default)] space-y-4">
-                  <h3 className="text-lg font-semibold text-[var(--text-heading)]">
+                <div className="p-6 bg-gray-50 rounded-xl border border-(--border-default) space-y-4">
+                  <h3 className="text-lg font-semibold text-(--text-heading)">
                     {editingAddress ? "Edit Address" : "New Shipping Address"}
                   </h3>
                   
@@ -1074,18 +1074,18 @@ const Checkout = () => {
           </AnimatePresence>
 
           {/* Billing Address Section */}
-          <div className="border-t border-[var(--border-default)] pt-6">
+          <div className="border-t border-(--border-default) pt-6">
             <div className="flex items-center gap-3 mb-4">
               <input
                 type="checkbox"
                 id="sameAsShipping"
                 checked={sameAsShipping}
                 onChange={(e) => setSameAsShipping(e.target.checked)}
-                className="w-5 h-5 text-[var(--color-brand-primary)] border-gray-300 rounded focus:ring-[var(--color-brand-primary)]"
+                className="w-5 h-5 text-(--color-brand-primary) border-gray-300 rounded focus:ring-(--color-brand-primary)"
               />
               <label
                 htmlFor="sameAsShipping"
-                className="text-sm font-medium text-[var(--text-heading)] cursor-pointer select-none"
+                className="text-sm font-medium text-(--text-heading) cursor-pointer select-none"
               >
                 Billing address is same as shipping
               </label>
@@ -1099,7 +1099,7 @@ const Checkout = () => {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden space-y-4"
                 >
-                  <h3 className="text-lg font-semibold text-[var(--text-heading)]">
+                  <h3 className="text-lg font-semibold text-(--text-heading)">
                     Billing Address
                   </h3>
                   
@@ -1123,7 +1123,7 @@ const Checkout = () => {
                       <button
                         type="button"
                         onClick={() => setShowNewBillingForm(true)}
-                        className="p-4 border-2 border-dashed border-[var(--border-default)] rounded-xl text-[var(--color-brand-primary)] font-medium hover:border-[var(--color-brand-primary)] hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+                        className="p-4 border-2 border-dashed border-(--border-default) rounded-xl text-(--color-brand-primary) font-medium hover:border-(--color-brand-primary) hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
                       >
                         <Plus size={20} />
                         Use Different Address
@@ -1132,7 +1132,7 @@ const Checkout = () => {
                   )}
 
                   {(showNewBillingForm || savedAddresses.length === 0) && (
-                    <div className="p-6 bg-gray-50 rounded-xl border border-[var(--border-default)]">
+                    <div className="p-6 bg-gray-50 rounded-xl border border-(--border-default)">
                       <AddressForm
                         data={formData.billing}
                         onChange={(field, value) => handleBillingChange(field, value)}
@@ -1172,7 +1172,7 @@ const Checkout = () => {
           <div className="flex gap-4 pt-4">
             <Link
               href="/cart"
-              className="flex-1 border-2 border-[var(--border-inverse)] text-[var(--text-primary)] px-6 py-4 rounded-full hover:bg-[var(--bg-inverse)] hover:text-[var(--text-inverse)] transition-all font-medium text-center flex items-center justify-center gap-2"
+              className="flex-1 border-2 border-(--border-inverse) text-(--text-primary) px-6 py-4 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium text-center flex items-center justify-center gap-2"
             >
               <ArrowLeft size={18} />
               Back to Cart
@@ -1180,7 +1180,7 @@ const Checkout = () => {
             <button
               type="submit"
               disabled={isLoading || (!selectedShippingAddress && !showNewShippingForm)}
-              className="flex-[2] bg-[var(--btn-bg-primary)] text-[var(--btn-text-primary)] px-6 py-4 rounded-full hover:bg-[var(--btn-bg-hover)] transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-2 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -1205,17 +1205,17 @@ const Checkout = () => {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="bg-white border border-[var(--border-default)] rounded-2xl p-6 md:p-8 shadow-sm"
+      className="bg-white border border-(--border-default) rounded-2xl p-6 md:p-8 shadow-sm"
     >
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-[var(--color-brand-primary)] rounded-full flex items-center justify-center">
+        <div className="w-12 h-12 bg-(--color-brand-primary) rounded-full flex items-center justify-center">
           <CreditCard size={24} className="text-white" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-[var(--text-heading)]">
+          <h2 className="text-2xl font-bold text-(--text-heading)">
             Payment & Shipping
           </h2>
-          <p className="text-sm text-[var(--text-secondary)]">
+          <p className="text-sm text-(--text-secondary)">
             Choose your preferred payment method
           </p>
         </div>
@@ -1231,12 +1231,12 @@ const Checkout = () => {
       {/* Shipping Method Selection */}
       {loadingShipping ? (
         <div className="flex items-center justify-center py-12 mb-6">
-          <Loader2 size={32} className="animate-spin text-[var(--color-brand-primary)]" />
-          <span className="ml-3 text-[var(--text-secondary)]">Loading shipping options...</span>
+          <Loader2 size={32} className="animate-spin text-(--color-brand-primary)" />
+          <span className="ml-3 text-(--text-secondary)">Loading shipping options...</span>
         </div>
       ) : shippingMethods.length > 0 ? (
         <div className="mb-8">
-          <h3 className="text-lg font-semibold mb-4 text-[var(--text-heading)] flex items-center gap-2">
+          <h3 className="text-lg font-semibold mb-4 text-(--text-heading) flex items-center gap-2">
             <Truck size={20} />
             Shipping Method
           </h3>
@@ -1247,8 +1247,8 @@ const Checkout = () => {
                 className={cn(
                   "flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all",
                   selectedShippingMethod === method.method
-                    ? "border-[var(--color-brand-primary)] bg-blue-50"
-                    : "border-[var(--border-default)] hover:border-[var(--color-brand-primary)]"
+                    ? "border-(--color-brand-primary) bg-blue-50"
+                    : "border-(--border-default) hover:border-(--color-brand-primary)"
                 )}
               >
                 <div className="flex items-center gap-4">
@@ -1258,11 +1258,11 @@ const Checkout = () => {
                     value={method.method}
                     checked={selectedShippingMethod === method.method}
                     onChange={(e) => setSelectedShippingMethod(e.target.value)}
-                    className="w-5 h-5 text-[var(--color-brand-primary)]"
+                    className="w-5 h-5 text-(--color-brand-primary)"
                   />
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-[var(--text-heading)]">
+                      <p className="font-semibold text-(--text-heading)">
                         {method.method === "STANDARD" && "Standard Shipping"}
                         {method.method === "EXPRESS" && "Express Shipping"}
                         {method.method === "OVERNIGHT" && "Overnight Shipping"}
@@ -1273,7 +1273,7 @@ const Checkout = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-[var(--text-secondary)] flex items-center gap-1 mt-1">
+                    <p className="text-sm text-(--text-secondary) flex items-center gap-1 mt-1">
                       <Clock size={14} />
                       {method.method === "STANDARD" && "5-7 business days"}
                       {method.method === "EXPRESS" && "2-3 business days"}
@@ -1281,7 +1281,7 @@ const Checkout = () => {
                     </p>
                   </div>
                 </div>
-                <span className="font-bold text-lg text-[var(--text-heading)]">
+                <span className="font-bold text-lg text-(--text-heading)">
                   {formatPrice(method.price, method.currency)}
                 </span>
               </label>
@@ -1299,7 +1299,7 @@ const Checkout = () => {
 
       {/* Payment Methods */}
       <div className="space-y-4 mb-8">
-        <h3 className="text-lg font-semibold text-[var(--text-heading)] flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-(--text-heading) flex items-center gap-2">
           <Shield size={20} />
           Payment Method
         </h3>
@@ -1308,8 +1308,8 @@ const Checkout = () => {
           className={cn(
             "flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all",
             paymentMethod === "cod"
-              ? "border-[var(--color-brand-primary)] bg-blue-50"
-              : "border-[var(--border-default)] hover:border-[var(--color-brand-primary)]"
+              ? "border-(--color-brand-primary) bg-blue-50"
+              : "border-(--border-default) hover:border-(--color-brand-primary)"
           )}
         >
           <div className="flex items-center gap-4">
@@ -1319,22 +1319,22 @@ const Checkout = () => {
               value="cod"
               checked={paymentMethod === "cod"}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-5 h-5 text-[var(--color-brand-primary)]"
+              className="w-5 h-5 text-(--color-brand-primary)"
             />
             <div>
-              <p className="font-semibold text-[var(--text-heading)]">Cash on Delivery</p>
-              <p className="text-sm text-[var(--text-secondary)]">Pay when you receive your order</p>
+              <p className="font-semibold text-(--text-heading)">Cash on Delivery</p>
+              <p className="text-sm text-(--text-secondary)">Pay when you receive your order</p>
             </div>
           </div>
-          <Package size={24} className="text-[var(--color-brand-primary)]" />
+          <Package size={24} className="text-(--color-brand-primary)" />
         </label>
 
         <label
           className={cn(
             "flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all",
             paymentMethod === "card"
-              ? "border-[var(--color-brand-primary)] bg-blue-50"
-              : "border-[var(--border-default)] hover:border-[var(--color-brand-primary)]"
+              ? "border-(--color-brand-primary) bg-blue-50"
+              : "border-(--border-default) hover:border-(--color-brand-primary)"
           )}
         >
           <div className="flex items-center gap-4">
@@ -1344,14 +1344,14 @@ const Checkout = () => {
               value="card"
               checked={paymentMethod === "card"}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-5 h-5 text-[var(--color-brand-primary)]"
+              className="w-5 h-5 text-(--color-brand-primary)"
             />
             <div>
-              <p className="font-semibold text-[var(--text-heading)]">Credit / Debit Card</p>
-              <p className="text-sm text-[var(--text-secondary)]">Visa, Mastercard, Amex</p>
+              <p className="font-semibold text-(--text-heading)">Credit / Debit Card</p>
+              <p className="text-sm text-(--text-secondary)">Visa, Mastercard, Amex</p>
             </div>
           </div>
-          <CreditCard size={24} className="text-[var(--color-brand-primary)]" />
+          <CreditCard size={24} className="text-(--color-brand-primary)" />
         </label>
       </div>
 
@@ -1362,7 +1362,7 @@ const Checkout = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden border-t border-[var(--border-default)] pt-6 mb-8"
+            className="overflow-hidden border-t border-(--border-default) pt-6 mb-8"
           >
             <div className="bg-gray-50 p-6 rounded-xl space-y-4">
               <div className="flex items-center gap-2 mb-4">
@@ -1371,7 +1371,7 @@ const Checkout = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+                <label className="block text-sm font-medium text-(--text-heading) mb-2">
                   Card Number *
                 </label>
                 <div className="relative">
@@ -1380,36 +1380,36 @@ const Checkout = () => {
                     type="text"
                     maxLength={19}
                     placeholder="1234 5678 9012 3456"
-                    className="w-full pl-10 pr-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors font-mono"
+                    className="w-full pl-10 pr-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+                <label className="block text-sm font-medium text-(--text-heading) mb-2">
                   Cardholder Name *
                 </label>
                 <input
                   type="text"
                   placeholder="JOHN DOE"
-                  className="w-full px-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors uppercase"
+                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors uppercase"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+                  <label className="block text-sm font-medium text-(--text-heading) mb-2">
                     Expiry Date *
                   </label>
                   <input
                     type="text"
                     placeholder="MM / YY"
                     maxLength={7}
-                    className="w-full px-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors font-mono"
+                    className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--text-heading)] mb-2">
+                  <label className="block text-sm font-medium text-(--text-heading) mb-2">
                     CVV *
                   </label>
                   <div className="relative">
@@ -1417,9 +1417,9 @@ const Checkout = () => {
                       type="password"
                       placeholder="123"
                       maxLength={4}
-                      className="w-full px-4 py-3 border border-[var(--border-default)] rounded-lg focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors font-mono"
+                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors font-mono"
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 group relative">
+                    <div className="right-3 top-1/2 -translate-y-1/2 group relative">
                       <AlertCircle size={18} className="text-gray-400" />
                       <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                         3 digits on back of card (4 for Amex)
@@ -1438,7 +1438,7 @@ const Checkout = () => {
         <button
           onClick={() => setStep(1)}
           disabled={isLoading}
-          className="flex-1 border-2 border-[var(--border-inverse)] text-[var(--text-primary)] px-6 py-4 rounded-full hover:bg-[var(--bg-inverse)] hover:text-[var(--text-inverse)] transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+          className="flex-1 border-2 border-(--border-inverse) text-(--text-primary) px-6 py-4 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <ArrowLeft size={18} />
           Back
@@ -1446,7 +1446,7 @@ const Checkout = () => {
         <button
           onClick={handlePlaceOrder}
           disabled={isLoading || shippingMethods.length === 0 || !selectedShippingMethod}
-          className="flex-[2] bg-[var(--btn-bg-primary)] text-[var(--btn-text-primary)] px-6 py-4 rounded-full hover:bg-[var(--btn-bg-hover)] transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-2 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <>
@@ -1470,35 +1470,35 @@ const Checkout = () => {
       animate={{ opacity: 1, scale: 1 }}
       className="max-w-2xl mx-auto"
     >
-      <div className="bg-white border border-[var(--border-default)] rounded-2xl p-8 md:p-12 text-center shadow-lg">
+      <div className="bg-white border border-(--border-default) rounded-2xl p-8 md:p-12 text-center shadow-lg">
         <div className="inline-flex items-center justify-center w-24 h-24 bg-green-100 rounded-full mb-6">
           <CheckCircle size={56} className="text-green-600" />
         </div>
 
-        <h1 className="text-3xl md:text-4xl font-bold mb-4 text-[var(--text-heading)]">
+        <h1 className="text-3xl md:text-4xl font-bold mb-4 text-(--text-heading)">
           Order Confirmed!
         </h1>
         
-        <p className="text-[var(--text-secondary)] text-lg mb-2">
+        <p className="text-(--text-secondary) text-lg mb-2">
           Thank you for your purchase
         </p>
         
-        <p className="text-[var(--text-secondary)] mb-8">
+        <p className="text-(--text-secondary) mb-8">
           Order #
-          <span className="font-semibold text-[var(--text-heading)]">
+          <span className="font-semibold text-(--text-heading)">
             {orderId?.slice(0, 8).toUpperCase()}
           </span>
         </p>
 
-        <div className="bg-[var(--bg-surface)] rounded-xl p-6 mb-8 text-left">
-          <h3 className="font-semibold mb-4 text-[var(--text-heading)] flex items-center gap-2">
+        <div className="bg-(--bg-surface) rounded-xl p-6 mb-8 text-left">
+          <h3 className="font-semibold mb-4 text-(--text-heading) flex items-center gap-2">
             <Package size={20} />
             Order Summary
           </h3>
           
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Subtotal</span>
+              <span className="text-(--text-secondary)">Subtotal</span>
               <span className="font-semibold">{formatPrice(orderDetails?.subtotal)}</span>
             </div>
             
@@ -1517,12 +1517,12 @@ const Checkout = () => {
             )}
             
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Shipping</span>
+              <span className="text-(--text-secondary)">Shipping</span>
               <span className="font-semibold">{formatPrice(orderDetails?.shippingAmount)}</span>
             </div>
             
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Tax</span>
+              <span className="text-(--text-secondary)">Tax</span>
               <span className="font-semibold">{formatPrice(orderDetails?.taxAmount)}</span>
             </div>
             
@@ -1534,13 +1534,13 @@ const Checkout = () => {
 
           <div className="mt-6 pt-6 border-t space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Payment Method</span>
+              <span className="text-(--text-secondary)">Payment Method</span>
               <span className="font-semibold">
                 {paymentMethod === "cod" ? "Cash on Delivery" : "Credit Card"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Shipping Method</span>
+              <span className="text-(--text-secondary)">Shipping Method</span>
               <span className="font-semibold">
                 {selectedShippingMethod === "EXPRESS" ? "Express (1-2 days)" : "Standard (3-5 days)"}
               </span>
@@ -1584,7 +1584,7 @@ const Checkout = () => {
         <div className="text-center">
           <Package size={64} className="mx-auto text-gray-300 mb-4" />
           <h2 className="text-2xl font-bold text-(--text-heading) mb-2">Your cart is empty</h2>
-          <p className="text-(--text-secondary)] mb-6">Add some items to proceed to checkout</p>
+          <p className="text-(--text-secondary) mb-6">Add some items to proceed to checkout</p>
           <Link
             href="/shop"
             className="inline-flex items-center gap-2 bg-(--btn-bg-primary) text-(--btn-text-primary) px-8 py-3 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium"

@@ -28,7 +28,6 @@ import { Country, State, City } from "country-state-city";
 import Select from "react-select";
 import Image from "next/image";
 import Link from "next/link";
-import { useAuthStore } from "@/store/authStore";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import axios from "axios";
@@ -38,6 +37,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import useCartStore from "@/store/useCartStore";
+import useAuthStore from "@/store/authStore";
 
 // Utility for cleaner tailwind classes
 function cn(...inputs) {

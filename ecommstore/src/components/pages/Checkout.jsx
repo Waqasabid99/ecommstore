@@ -23,7 +23,7 @@ import {
   Briefcase,
   Trash2,
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import useAuth from "@/hooks/useAuth";
 import { Country, State, City } from "country-state-city";
 import Select from "react-select";
 import Image from "next/image";

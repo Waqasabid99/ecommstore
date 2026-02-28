@@ -62,7 +62,7 @@ const ProductCard = ({ product }) => {
         )}
 
         {/* Tag Badges (Sale, New, etc.) */}
-        {product.tag?.map((tag, index) => (
+        {product.tag?.slice(0, 2).map((tag, index) => (
           <span
             key={index}
             className="bg-black text-white text-xs font-semibold px-2 py-1 rounded uppercase"

@@ -45,7 +45,7 @@ const Checkout = () => {
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
 
-  const { getCartItems, getCartSummary, initializeCart } = useCartStore();
+  const { getCartItems, getCartSummary, initializeCart, items, guestCart } = useCartStore();
   const { isAuthenticated, user } = useAuth();
   const { login, register, error: storeError, clearError } = useAuthStore();
 
@@ -102,6 +102,15 @@ const Checkout = () => {
     password: "",
   });
 
+  useEffect(() => {
+    console.log("Cart Debug:", {
+      isAuthenticated,
+      serverItems: items,
+      guestCart: guestCart,
+      getCartItemsResult: getCartItems(),
+    });
+  }, [isAuthenticated, items, guestCart]);
+
   // Auto-fill user data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -112,6 +121,10 @@ const Checkout = () => {
         fullName: user.username || "",
         email: user.email || "",
       }));
+
+    // Also refresh cart to ensure we have latest server state
+    const { initializeCart } = useCartStore.getState();
+    initializeCart();
     }
   }, [isAuthenticated, user]);
 
@@ -162,11 +175,15 @@ const Checkout = () => {
 
       if (result?.success) {
         setAuthError("");
+        const { mergeGuestCart, guestCart } = useCartStore.getState();
+        if (guestCart && guestCart.length > 0) {
+          await mergeGuestCart();
+        }
       } else {
         setAuthError(
           storeError ||
-            result?.error?.message ||
-            `${hasAccount ? "Login" : "Registration"} failed.`
+          result?.error?.message ||
+          `${hasAccount ? "Login" : "Registration"} failed.`
         );
       }
     } catch (error) {
@@ -343,10 +360,10 @@ const Checkout = () => {
     } catch (error) {
       console.error("Checkout error:", error);
       const errorData = error.response?.data;
-      
+
       // Handle inventory errors specially
       if (errorData?.details && Array.isArray(errorData.details)) {
-        const inventoryMessages = errorData.details.map(issue => 
+        const inventoryMessages = errorData.details.map(issue =>
           `${issue.name || 'Item'}: ${issue.issue}`
         ).join('\n');
         setAuthError(`Inventory issues:\n${inventoryMessages}`);
@@ -504,18 +521,16 @@ const Checkout = () => {
           <div className="mt-8 flex items-center justify-center gap-4">
             <div className="flex items-center gap-2">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                  step >= 1
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 1
                     ? "bg-(--bg-primary) text-(--text-inverse)"
                     : "bg-white text-(--text-secondary) border border-(--border-default)"
-                }`}
+                  }`}
               >
                 1
               </div>
               <span
-                className={`hidden sm:inline font-medium ${
-                  step >= 1 ? "text-(--text-heading)" : "text-(--text-secondary)"
-                }`}
+                className={`hidden sm:inline font-medium ${step >= 1 ? "text-(--text-heading)" : "text-(--text-secondary)"
+                  }`}
               >
                 Shipping
               </span>
@@ -525,18 +540,16 @@ const Checkout = () => {
 
             <div className="flex items-center gap-2">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                  step >= 2
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 2
                     ? "bg-(--bg-primary) text-(--text-inverse)"
                     : "bg-white text-(--text-secondary) border border-(--border-default)"
-                }`}
+                  }`}
               >
                 2
               </div>
               <span
-                className={`hidden sm:inline font-medium ${
-                  step >= 2 ? "text-(--text-heading)" : "text-(--text-secondary)"
-                }`}
+                className={`hidden sm:inline font-medium ${step >= 2 ? "text-(--text-heading)" : "text-(--text-secondary)"
+                  }`}
               >
                 Payment
               </span>
@@ -546,18 +559,16 @@ const Checkout = () => {
 
             <div className="flex items-center gap-2">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                  step >= 3
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 3
                     ? "bg-(--bg-primary) text-(--text-inverse)"
                     : "bg-white text-(--text-secondary) border border-(--border-default)"
-                }`}
+                  }`}
               >
                 3
               </div>
               <span
-                className={`hidden sm:inline font-medium ${
-                  step >= 3 ? "text-(--text-heading)" : "text-(--text-secondary)"
-                }`}
+                className={`hidden sm:inline font-medium ${step >= 3 ? "text-(--text-heading)" : "text-(--text-secondary)"
+                  }`}
               >
                 Confirm
               </span>
@@ -1077,13 +1088,13 @@ const Checkout = () => {
                                   value={
                                     billingInfo.state
                                       ? {
-                                          value: billingInfo.state,
-                                          label:
-                                            State.getStateByCodeAndCountry(
-                                              billingInfo.state,
-                                              billingInfo.country
-                                            )?.name || billingInfo.state,
-                                        }
+                                        value: billingInfo.state,
+                                        label:
+                                          State.getStateByCodeAndCountry(
+                                            billingInfo.state,
+                                            billingInfo.country
+                                          )?.name || billingInfo.state,
+                                      }
                                       : null
                                   }
                                   onChange={(option) =>
@@ -1117,9 +1128,9 @@ const Checkout = () => {
                                   value={
                                     billingInfo.city
                                       ? {
-                                          value: billingInfo.city,
-                                          label: billingInfo.city,
-                                        }
+                                        value: billingInfo.city,
+                                        label: billingInfo.city,
+                                      }
                                       : null
                                   }
                                   onChange={(option) =>
@@ -1220,11 +1231,10 @@ const Checkout = () => {
                         {shippingMethods.map((method) => (
                           <label
                             key={method.id}
-                            className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                              selectedShippingMethod === method.method
+                            className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedShippingMethod === method.method
                                 ? "border-(--color-brand-primary) bg-blue-50"
                                 : "border-(--border-default) hover:border-(--color-brand-primary)"
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-4">
                               <input
@@ -1267,11 +1277,10 @@ const Checkout = () => {
 
                     {/* Cash on Delivery */}
                     <label
-                      className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        paymentMethod === "cod"
+                      className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === "cod"
                           ? "border-(--color-brand-primary) bg-blue-50"
                           : "border-(--border-default) hover:border-(--color-brand-primary)"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-4">
                         <input
@@ -1299,11 +1308,10 @@ const Checkout = () => {
 
                     {/* Credit/Debit Card */}
                     <label
-                      className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        paymentMethod === "card"
+                      className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === "card"
                           ? "border-(--color-brand-primary) bg-blue-50"
                           : "border-(--border-default) hover:border-(--color-brand-primary)"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-4">
                         <input

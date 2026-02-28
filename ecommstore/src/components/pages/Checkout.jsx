@@ -400,7 +400,7 @@ const Checkout = () => {
   );
 
   // Form Data
-  const [formData, setFormData] = useState<CheckoutFormData>({
+  const [formData, setFormData] = useState({
     shipping: {
       fullName: "",
       email: "",

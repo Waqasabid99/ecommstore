@@ -3,7 +3,6 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Search,
   ShoppingCart,
-  Heart,
   User,
   Menu,
   X,
@@ -354,13 +353,6 @@ const Navbar = () => {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 sm:gap-4">
-              <button
-                className="hidden sm:flex p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
-                aria-label="Wishlist"
-              >
-                <Heart size={24} />
-              </button>
-
               <div className="relative">
                 <button
                   onClick={() => {
@@ -571,13 +563,6 @@ const Navbar = () => {
               >
                 <Phone size={16} />
                 <span className="text-sm">000-123-456789</span>
-              </Link>
-              <Link
-                href="/wishlist"
-                className="flex items-center gap-2 py-2 text-(--text-secondary) hover:text-(--text-hover) transition-colors sm:hidden"
-              >
-                <Heart size={16} />
-                <span className="text-sm">Wishlist</span>
               </Link>
             </div>
           </div>

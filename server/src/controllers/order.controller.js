@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma.js";
 import { calculatePricing } from "../constants/pricing.js";
+import { syncInvoiceStatusForOrder } from "../services/invoice.service.js";
 
 // Get order by ID
 const getOrderById = async (req, res) => {
@@ -61,6 +62,10 @@ const getOrderById = async (req, res) => {
         },
         refunds: true,
         returns: true,
+        invoices: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
     });
 
@@ -431,6 +436,8 @@ const updateOrderStatus = async (req, res) => {
       return updated;
     });
 
+    await syncInvoiceStatusForOrder(orderId);
+
     return res.status(200).json({
       success: true,
       message: "Order status updated successfully",
@@ -533,6 +540,8 @@ const cancelOrder = async (req, res) => {
 
       return updatedOrder;
     });
+
+    await syncInvoiceStatusForOrder(orderId);
 
     return res.status(200).json({
       success: true,

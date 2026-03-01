@@ -19,6 +19,7 @@ import returnRouter from "./routes/return.routes.js";
 import contactRouter from "./routes/contactus.routes.js";
 import promotionRouter from "./routes/promotion.routes.js";
 import shippingRouter from "./routes/shipping.routes.js";
+import invoiceRouter from "./routes/invoice.routes.js";
 import { hostname } from "os";
 const app = express();
 const port = process.env.NODE_ENV === "production" ? process.env.PORT : 5000;
@@ -56,6 +57,7 @@ app.use("/retruns-refunds", returnRouter);
 app.use("/dashboard", dashboardRouter);
 app.use("/contact", contactRouter);
 app.use("/shipping", shippingRouter);
+app.use("/invoices", invoiceRouter);
 app.use("/seed", seedRouter);
 
 app.listen(port, () => {

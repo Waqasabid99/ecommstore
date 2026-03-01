@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma.js";
 import Decimal from "decimal.js";
 import { calculatePricingWithPromotions } from "../constants/pricing.js";
+import { ensureInvoiceForOrder } from "../services/invoice.service.js";
 
 /**
  * Initiate checkout and create order
@@ -376,10 +377,21 @@ const initiateCheckout = async (req, res) => {
             }
         );
 
+        let invoice = null;
+        try {
+            invoice = await ensureInvoiceForOrder(result.orderId);
+        } catch (invoiceError) {
+            console.error("Invoice generation failed after checkout:", invoiceError);
+        }
+
         return res.status(201).json({
             success: true,
             message: "Order created successfully",
-            data: result,
+            data: {
+                ...result,
+                invoiceId: invoice?.id || null,
+                invoiceUrl: invoice?.pdfUrl || null,
+            },
         });
     } catch (error) {
         console.error("Checkout error:", error);

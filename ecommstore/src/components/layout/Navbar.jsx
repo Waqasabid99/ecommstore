@@ -42,16 +42,16 @@ const Navbar = () => {
   const searchRef = useRef(null);
 
   const { getCartItems, getCartSummary } = useCartStore();
-  const { itemCount, subtotal } = getCartSummary();
+  const { itemCount, subtotal } = getCartSummary(user);
 
-  const cartItems = getCartItems();
+  const cartItems = getCartItems(user);
   const router = useRouter();
   const pathname = usePathname();
 
   // Initialize Fuse instance
   const fuse = useMemo(() => {
     if (!products.length) return null;
-    
+
     const options = {
       keys: [
         { name: 'name', weight: 0.7 },
@@ -64,7 +64,7 @@ const Navbar = () => {
       includeScore: true,
       minMatchCharLength: 2
     };
-    
+
     return new Fuse(products, options);
   }, [products]);
 
@@ -89,14 +89,14 @@ const Navbar = () => {
     }
 
     let results;
-    
+
     if (selectedCategory) {
       // Filter products by category first, then search
       const categoryProducts = products.filter(
-        product => product.category?.id === selectedCategory || 
-                  product.category?.slug === selectedCategory
+        product => product.category?.id === selectedCategory ||
+          product.category?.slug === selectedCategory
       );
-      
+
       const categoryFuse = new Fuse(categoryProducts, {
         keys: [
           { name: 'name', weight: 0.7 },
@@ -108,13 +108,13 @@ const Navbar = () => {
         includeScore: true,
         minMatchCharLength: 2
       });
-      
+
       results = categoryFuse.search(searchQuery).slice(0, 8);
     } else {
       // Search all products
       results = fuse.search(searchQuery).slice(0, 8);
     }
-    
+
     setSearchResults(results);
   }, [searchQuery, selectedCategory, fuse, products]);
 
@@ -176,7 +176,7 @@ const Navbar = () => {
       const queryParams = new URLSearchParams();
       queryParams.set("q", searchQuery);
       if (selectedCategory) queryParams.set("category", selectedCategory);
-      
+
       router.push(`/shop?${queryParams.toString()}`);
       setIsSearchFocused(false);
     }
@@ -264,12 +264,12 @@ const Navbar = () => {
             </div>
 
             {/* Search Bar - Desktop & Tablet */}
-            <div 
+            <div
               className="hidden md:flex flex-1 max-w-2xl mx-4 lg:mx-8 relative"
               ref={searchRef}
             >
               <form onSubmit={handleSearchSubmit} className="relative w-full">
-                <select 
+                <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="absolute left-0 top-0 h-full px-4 pr-8 bg-black text-white rounded-l-full text-sm font-medium border-none outline-none appearance-none cursor-pointer hover:bg-gray-900 transition-colors z-10 max-w-1/4"
@@ -285,7 +285,7 @@ const Navbar = () => {
                   onFocus={() => setIsSearchFocused(true)}
                   className="w-full pl-44 pr-12 py-3 rounded-full bg-(--bg-surface) border border-(--border-default) focus:outline-none focus:border-(--border-primary) transition-colors text-sm"
                 />
-                <button 
+                <button
                   type="submit"
                   className="absolute right-2 top-1/2 -translate-y-1/2 bg-(--color-brand-primary) text-white p-2 rounded-full hover:opacity-90 transition-opacity"
                 >
@@ -308,12 +308,12 @@ const Navbar = () => {
                         <Link
                           key={item.id}
                           href={`/shop/products/${item.slug}`}
-                         onClick={handleResultClick}
+                          onClick={handleResultClick}
                           className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b border-(--border-default) last:border-0 transition-colors no-underline text-current"
                         >
                           {item.thumbnail && (
-                            <img 
-                              src={item.thumbnail} 
+                            <img
+                              src={item.thumbnail}
                               alt={item.name}
                               className="w-12 h-12 object-cover rounded-md"
                             />
@@ -334,7 +334,7 @@ const Navbar = () => {
                           <Search size={16} className="text-(--text-secondary) opacity-50" />
                         </Link>
                       ))}
-                      <button 
+                      <button
                         onClick={handleSearchSubmit}
                         className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 text-center text-sm font-medium text-(--color-brand-primary) transition-colors border-t border-(--border-default)"
                       >
@@ -365,7 +365,7 @@ const Navbar = () => {
                 <button
                   onClick={() => {
                     setIsCartOpen(!isCartOpen);
-                    getCartItems();
+                    getCartItems(user);
                   }}
                   className="flex items-center border gap-2 sm:gap-3 md:border lg:border text-black px-3 sm:px-4 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all group"
                 >
@@ -515,14 +515,14 @@ const Navbar = () => {
                 onFocus={() => setIsSearchFocused(true)}
                 className="w-full pl-4 pr-12 py-2.5 rounded-full bg-(--bg-surface) border border-(--border-default) focus:outline-none focus:border-(--border-primary) transition-colors text-sm"
               />
-              <button 
+              <button
                 type="submit"
                 className="absolute right-2 top-1/2 -translate-y-1/2 bg-(--color-brand-primary) text-white p-2 rounded-full"
               >
                 <Search size={16} />
               </button>
             </form>
-            
+
             {/* Mobile Search Results */}
             {isSearchFocused && searchResults.length > 0 && (
               <div className="absolute left-4 right-4 mt-2 bg-white rounded-lg shadow-2xl border border-(--border-default) z-50 max-h-64 overflow-y-auto">
@@ -555,11 +555,10 @@ const Navbar = () => {
                   key={link.path}
                   href={link.path}
                   className={`block py-2 font-medium transition-colors
-              ${
-                isActive
-                  ? "text-(--text-active) border-b-2 border-(--text-active)"
-                  : "text-(--text-primary) hover:text-(--text-hover)"
-              }`}
+              ${isActive
+                      ? "text-(--text-active) border-b-2 border-(--text-active)"
+                      : "text-(--text-primary) hover:text-(--text-hover)"
+                    }`}
                 >
                   {link.name}
                 </Link>
@@ -597,11 +596,10 @@ const Navbar = () => {
                   key={link.path}
                   href={link.path}
                   className={`block py-2 font-medium transition-colors
-              ${
-                isActive
-                  ? "text-(--text-active) border-b-2 border-(--text-active)"
-                  : "text-(--text-primary) hover:text-(--text-hover)"
-              }`}
+              ${isActive
+                      ? "text-(--text-active) border-b-2 border-(--text-active)"
+                      : "text-(--text-primary) hover:text-(--text-hover)"
+                    }`}
                 >
                   {link.name}
                 </Link>

@@ -23,9 +23,9 @@ const AdminNavbar = () => {
   const { isAuthenticated, user } = useAuth();
 
   const { getCartItems, getCartSummary } = useCartStore();
-  const { itemCount, subtotal } = getCartSummary();
+  const { itemCount, subtotal } = getCartSummary(user);
 
-  const cartItems = getCartItems();
+  const cartItems = getCartItems(user);
   const navigate = useRouter();
   const pathname = usePathname();
   const isUserPage = pathname.startsWith("/user/");
@@ -38,13 +38,13 @@ const AdminNavbar = () => {
   const handleLogout = async () => {
     setIsCartOpen(false);
     try {
-        await logout();
-        navigate.push("/");
-        navigate.refresh();
+      await logout();
+      navigate.push("/");
+      navigate.refresh();
     } catch (error) {
-        console.error("Logout error:", error);
+      console.error("Logout error:", error);
     } finally {
-        setOpenProfileDropDown(false);
+      setOpenProfileDropDown(false);
     }
   };
 
@@ -83,88 +83,88 @@ const AdminNavbar = () => {
 
                 {/* Cart */}
                 {isAdminPage ? null : (
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setIsCartOpen(!isCartOpen);
-                      getCartItems();
-                    }}
-                    className="flex items-center border gap-2 sm:gap-3 md:border lg:border text-black px-3 sm:px-4 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all group"
-                  >
-                    <ShoppingCart
-                      size={35}
-                      className="bg-black p-2 text-white border rounded-full group-hover:scale-110 transition-transform"
-                    />
-                    <div className="md:group-hover:text-(--text-inverse) md:group-hover:border-(--border-default) lg:group-hover:text-(--text-inverse) hidden sm:group-hover:text-white sm:flex flex-col items-start">
-                      <span className="text-xs opacity-80">Total</span>
-                      <span className="text-sm font-semibold">
-                        Rs. {subtotal ?? 0.0}
-                      </span>
-                    </div>
-                  </button>
-
-                  {/* Cart Dropdown */}
-                  {isCartOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 bg-black/20 z-40"
-                        onClick={() => setIsCartOpen(false)}
-                      ></div>
-                      <div className="absolute -right-12 mt-2 w-72 lg:w-96 md:82 bg-white rounded-lg shadow-2xl border border-(--border-default) z-50 overflow-hidden">
-                        <div className="bg-black text-white px-4 py-3">
-                          <h3 className="font-semibold text-lg">
-                            Shopping Cart
-                          </h3>
-                          <p className="text-sm opacity-80">
-                            {cartItems ? itemCount : "0"} items
-                          </p>
-                        </div>
-                        <div className="max-h-96 overflow-y-auto">
-                          {cartItems?.map((item) => (
-                            <div
-                              key={item.id}
-                              className="px-4 py-3 border-b border-(--border-default) hover:bg-gray-50 transition-colors"
-                            >
-                              <Link
-                                href={`/shop/products/${item?.product?.slug}`}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-sm text-(--text-primary)">
-                                      {item.name}
-                                    </h4>
-                                    <p className="text-xs text-(--text-secondary) mt-1">
-                                      Rs. {item?.price || "0.00"}
-                                    </p>
-                                  </div>
-                                  <span className="text-sm font-semibold text-(--text-primary)">
-                                    ×{item?.quantity || "0"}
-                                  </span>
-                                </div>
-                              </Link>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="px-4 py-4 bg-gray-50 border-t border-(--border-default)">
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="font-semibold text-(--text-heading)">
-                              Total:
-                            </span>
-                            <span className="text-xl font-bold text-(--color-brand-primary)">
-                              Rs. {subtotal ?? 0.0}
-                            </span>
-                          </div>
-                          <Link
-                            href={"/cart"}
-                            className="w-full flex justify-center bg-black text-white py-3 rounded-full font-semibold hover:bg-(--btn-bg-hover) transition-colors"
-                          >
-                            View Cart
-                          </Link>
-                        </div>
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setIsCartOpen(!isCartOpen);
+                        getCartItems(user);
+                      }}
+                      className="flex items-center border gap-2 sm:gap-3 md:border lg:border text-black px-3 sm:px-4 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all group"
+                    >
+                      <ShoppingCart
+                        size={35}
+                        className="bg-black p-2 text-white border rounded-full group-hover:scale-110 transition-transform"
+                      />
+                      <div className="md:group-hover:text-(--text-inverse) md:group-hover:border-(--border-default) lg:group-hover:text-(--text-inverse) hidden sm:group-hover:text-white sm:flex flex-col items-start">
+                        <span className="text-xs opacity-80">Total</span>
+                        <span className="text-sm font-semibold">
+                          Rs. {subtotal ?? 0.0}
+                        </span>
                       </div>
-                    </>
-                  )}
-                </div>
+                    </button>
+
+                    {/* Cart Dropdown */}
+                    {isCartOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 bg-black/20 z-40"
+                          onClick={() => setIsCartOpen(false)}
+                        ></div>
+                        <div className="absolute -right-12 mt-2 w-72 lg:w-96 md:82 bg-white rounded-lg shadow-2xl border border-(--border-default) z-50 overflow-hidden">
+                          <div className="bg-black text-white px-4 py-3">
+                            <h3 className="font-semibold text-lg">
+                              Shopping Cart
+                            </h3>
+                            <p className="text-sm opacity-80">
+                              {cartItems ? itemCount : "0"} items
+                            </p>
+                          </div>
+                          <div className="max-h-96 overflow-y-auto">
+                            {cartItems?.map((item) => (
+                              <div
+                                key={item.id}
+                                className="px-4 py-3 border-b border-(--border-default) hover:bg-gray-50 transition-colors"
+                              >
+                                <Link
+                                  href={`/shop/products/${item?.product?.slug}`}
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <h4 className="font-medium text-sm text-(--text-primary)">
+                                        {item.name}
+                                      </h4>
+                                      <p className="text-xs text-(--text-secondary) mt-1">
+                                        Rs. {item?.price || "0.00"}
+                                      </p>
+                                    </div>
+                                    <span className="text-sm font-semibold text-(--text-primary)">
+                                      ×{item?.quantity || "0"}
+                                    </span>
+                                  </div>
+                                </Link>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="px-4 py-4 bg-gray-50 border-t border-(--border-default)">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="font-semibold text-(--text-heading)">
+                                Total:
+                              </span>
+                              <span className="text-xl font-bold text-(--color-brand-primary)">
+                                Rs. {subtotal ?? 0.0}
+                              </span>
+                            </div>
+                            <Link
+                              href={"/cart"}
+                              className="w-full flex justify-center bg-black text-white py-3 rounded-full font-semibold hover:bg-(--btn-bg-hover) transition-colors"
+                            >
+                              View Cart
+                            </Link>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
                 {/* User Profile */}
                 {isAuthenticated ? (

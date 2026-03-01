@@ -387,8 +387,8 @@ const Checkout = () => {
   const { login, register, error: storeError, clearError } = useAuthStore();
 
   // Derived Data
-  const orderItems = useMemo(() => getCartItems(), [getCartItems, items, guestCart]);
-  const { subtotal, discountAmount, promotionSavings, taxAmount, total, shippingAmount } = getCartSummary();
+  const orderItems = useMemo(() => getCartItems(user), [getCartItems, items, guestCart, user]);
+  const { subtotal, discountAmount, promotionSavings, taxAmount, total, shippingAmount } = getCartSummary(user);
 
   const countryOptions = useMemo(
     () =>
@@ -466,9 +466,8 @@ const Checkout = () => {
           email: user.email || prev.shipping.email,
         },
       }));
-      initializeCart();
     }
-  }, [isAuthenticated, user, initializeCart]);
+  }, [isAuthenticated, user]);
 
   // Clear errors on unmount
   useEffect(() => {

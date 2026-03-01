@@ -20,25 +20,27 @@ const useCartStore = create(
       // COMPUTED VALUES
       // =====================
 
-      getCartItems: () => {
+      getCartItems: (userOverride) => {
         const state = get();
         const user =
-          typeof window !== "undefined"
-            ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-              ?.user
-            : null;
+          userOverride !== undefined ? userOverride :
+            (typeof window !== "undefined"
+              ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
+                ?.user
+              : null);
 
         return user ? state.items : state.guestCart;
       },
 
-      getCartSummary: () => {
+      getCartSummary: (userOverride) => {
         const state = get();
-        const items = get().getCartItems();
+        const items = get().getCartItems(userOverride);
         const user =
-          typeof window !== "undefined"
-            ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-              ?.user
-            : null;
+          userOverride !== undefined ? userOverride :
+            (typeof window !== "undefined"
+              ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
+                ?.user
+              : null);
 
         if (user && state.summary) {
           return state.summary;

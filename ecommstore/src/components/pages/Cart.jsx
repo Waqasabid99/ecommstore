@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import useCartStore from "@/store/useCartStore";
+import useAuthStore from "@/store/authStore";
 import Loader from "../ui/Loader";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion"; // Optional but recommendeds
@@ -40,9 +41,8 @@ const Toast = ({ message, type, onClose }) => {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg ${
-        type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"
-      }`}
+      className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg ${type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"
+        }`}
     >
       {type === "success" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
       <span className="text-sm font-medium">{message}</span>
@@ -54,9 +54,9 @@ const Toast = ({ message, type, onClose }) => {
 };
 
 // Suggested coupons component
-const SuggestedCoupons = ({ 
-  onSelect, 
-  subtotal 
+const SuggestedCoupons = ({
+  onSelect,
+  subtotal
 }) => {
   // In real app, fetch from API based on cart contents
   const suggestions = [
@@ -105,8 +105,10 @@ const Cart = () => {
     recentlyRemovedCoupon,
   } = useCartStore();
 
-  const cartItems = getCartItems();
-  const cartSummary = getCartSummary();
+  const { user } = useAuthStore();
+
+  const cartItems = getCartItems(user);
+  const cartSummary = getCartSummary(user);
 
   // Refs for focus management
   const promoInputRef = useRef(null);
@@ -154,7 +156,7 @@ const Cart = () => {
   const updateQuantity = async (itemId, currentQty, delta) => {
     const newQty = currentQty + delta;
     if (newQty < 1 || newQty > 99) return;
-    
+
     setLoadingItem(itemId);
     try {
       const result = await updateCartItem(itemId, newQty);
@@ -180,11 +182,11 @@ const Cart = () => {
   // Debounced validation
   const validatePromoCode = useCallback(async (code) => {
     if (!code.trim() || code.length < 3) return;
-    
+
     setIsValidating(true);
     const result = await validateCoupon(code);
     setIsValidating(false);
-    
+
     if (!result.valid && result.error) {
       setPromoError(result.error);
     } else {
@@ -208,9 +210,9 @@ const Cart = () => {
 
     if (result.success) {
       setPromoCode("");
-      setToast({ 
-        message: `Coupon applied! You saved Rs. ${parseFloat(result.data?.discountAmount || discountAmount).toLocaleString()}`, 
-        type: "success" 
+      setToast({
+        message: `Coupon applied! You saved Rs. ${parseFloat(result.data?.discountAmount || discountAmount).toLocaleString()}`,
+        type: "success"
       });
       // Return focus to input for potential next coupon (stacking if supported)
       promoInputRef.current?.focus();
@@ -223,13 +225,13 @@ const Cart = () => {
   const handleRemoveCoupon = async () => {
     const removedCoupon = appliedCoupon;
     const savedAmount = discountAmount;
-    
+
     const result = await removeCoupon();
-    
+
     if (result.success) {
-      setToast({ 
-        message: `Removed ${removedCoupon?.code}. You can reapply it within 5 seconds.`, 
-        type: "success" 
+      setToast({
+        message: `Removed ${removedCoupon?.code}. You can reapply it within 5 seconds.`,
+        type: "success"
       });
       // Focus input for easy re-entry
       promoInputRef.current?.focus();
@@ -272,7 +274,7 @@ const Cart = () => {
         <section className="mx-4 my-6">
           <div className="max-w-7xl mx-auto">
             <div className="bg-white border border-gray-200 rounded-xl p-12 md:p-20 text-center">
-              <motion.div 
+              <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 className="inline-flex items-center justify-center w-24 h-24 bg-gray-50 rounded-full mb-6"
@@ -305,10 +307,10 @@ const Cart = () => {
       {/* Toast Notifications */}
       <AnimatePresence>
         {toast && (
-          <Toast 
-            message={toast.message} 
-            type={toast.type} 
-            onClose={() => setToast(null)} 
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
           />
         )}
       </AnimatePresence>
@@ -547,13 +549,12 @@ const Cart = () => {
                             }}
                             onKeyDown={handlePromoKeyDown}
                             placeholder="Enter promo code (e.g., SAVE10)"
-                            className={`w-full px-4 py-3 text-sm sm:text-base border-2 rounded-lg focus:outline-none transition-all ${
-                              promoError
-                                ? "border-red-300 focus:border-red-500 bg-red-50"
-                                : isValidating
+                            className={`w-full px-4 py-3 text-sm sm:text-base border-2 rounded-lg focus:outline-none transition-all ${promoError
+                              ? "border-red-300 focus:border-red-500 bg-red-50"
+                              : isValidating
                                 ? "border-blue-300 bg-blue-50"
                                 : "border-gray-200 focus:border-blue-500 bg-white"
-                            }`}
+                              }`}
                             aria-invalid={!!promoError}
                             aria-describedby={promoError ? "promo-error" : undefined}
                           />
@@ -602,9 +603,9 @@ const Cart = () => {
 
                       {/* Suggested Coupons */}
                       {!promoCode && (
-                        <SuggestedCoupons 
-                          onSelect={handleSuggestedCoupon} 
-                          subtotal={parseFloat(subtotal)} 
+                        <SuggestedCoupons
+                          onSelect={handleSuggestedCoupon}
+                          subtotal={parseFloat(subtotal)}
                         />
                       )}
 
@@ -642,7 +643,7 @@ const Cart = () => {
 
                   {/* Promotion Savings */}
                   {parseFloat(promotionSavings) > 0 && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       className="flex justify-between text-green-600 text-sm sm:text-base"
@@ -657,7 +658,7 @@ const Cart = () => {
 
                   {/* Coupon Discount */}
                   {appliedCoupon && parseFloat(discountAmount) > 0 && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       className="flex justify-between text-green-600 text-sm sm:text-base"

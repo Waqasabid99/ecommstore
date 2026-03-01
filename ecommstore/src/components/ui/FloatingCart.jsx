@@ -1,34 +1,35 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShoppingCart, X, Plus, Minus, Trash2 } from "lucide-react";
 import useCartStore from "@/store/useCartStore";
+import useAuthStore from "@/store/authStore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Loader from "./Loader";
 import Image from "next/image";
 
 const FloatingCart = () => {
+  const { user } = useAuthStore();
   const { getCartItems, getCartSummary, updateCartItem, removeCartItem } =
     useCartStore();
-  const { totalQuantity, subtotal } = getCartSummary();
-  const cartItems = getCartItems();
+  const { totalQuantity, subtotal } = getCartSummary(user);
+  const cartItems = getCartItems(user);
   const [isLoading, setIsLoading] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const router = useRouter();
 
-const updateQuantity = async (itemId, currentQty, delta) => {
-  const newQty = currentQty + delta;
-  if (newQty < 1 || newQty > 99) return;
+  const updateQuantity = async (itemId, currentQty, delta) => {
+    const newQty = currentQty + delta;
+    if (newQty < 1 || newQty > 99) return;
 
-  setIsLoading(itemId);
+    setIsLoading(itemId);
 
-  try {
-    await updateCartItem(itemId, newQty);
-  } finally {
-    setIsLoading(null);
-  }
-};
+    try {
+      await updateCartItem(itemId, newQty);
+    } finally {
+      setIsLoading(null);
+    }
+  };
 
   const removeItem = (itemId) => {
     removeCartItem(itemId);

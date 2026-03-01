@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Loader from "./Loader";
 import Image from "next/image";
+import { ShoppingCart } from "lucide-react";
 
 const FloatingCart = () => {
   const { user } = useAuthStore();

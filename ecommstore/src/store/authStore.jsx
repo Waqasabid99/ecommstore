@@ -17,20 +17,20 @@ const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const { data } = await api.post("/auth/register", formData);
-          
+
           // Set auth state first
-          set({ 
-            user: data.user, 
-            address: data.address, 
+          set({
+            user: data.user,
+            address: data.address,
             isAuthenticated: true,
-            isLoading: false 
+            isLoading: false
           });
 
           // Get fresh cart store instance and merge with explicit user context
           const cartStore = useCartStore.getState();
-       
+
           await cartStore.mergeGuestCart(data.user);
-          await cartStore.initializeCart();
+          await cartStore.initializeCart(data.user);
 
           return { success: true };
         } catch (err) {
@@ -64,7 +64,7 @@ const useAuthStore = create(
           const cartStore = useCartStore.getState();
 
           await cartStore.mergeGuestCart(data.user);
-          await cartStore.initializeCart();
+          await cartStore.initializeCart(data.user);
 
           return { success: true };
         } catch (err) {

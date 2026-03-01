@@ -25,7 +25,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         return user ? state.items : state.guestCart;
@@ -37,7 +37,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         if (user && state.summary) {
@@ -70,12 +70,13 @@ const useCartStore = create(
       // INITIALIZE CART
       // =====================
 
-      initializeCart: async () => {
+      initializeCart: async (userOverride) => {
         const user =
-          typeof window !== "undefined"
+          userOverride ??
+          (typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
-            : null;
+              ?.user
+            : null);
 
         if (!user) {
           set({ cart: null, items: [], summary: null });
@@ -110,7 +111,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         if (user) {
@@ -214,7 +215,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         if (user) {
@@ -282,7 +283,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         if (user) {
@@ -324,7 +325,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         if (user) {
@@ -374,7 +375,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         if (!user) {
@@ -416,7 +417,7 @@ const useCartStore = create(
         const user =
           typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null;
 
         if (!user) {
@@ -456,7 +457,7 @@ const useCartStore = create(
           currentUser ||
           (typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
+              ?.user
             : null);
 
         if (!user) {

@@ -59,8 +59,8 @@ const selectStyles = {
     backgroundColor: state.isSelected
       ? "var(--color-brand-primary)"
       : state.isFocused
-      ? "var(--bg-surface)"
-      : "white",
+        ? "var(--bg-surface)"
+        : "white",
     color: state.isSelected ? "white" : "var(--text-heading)",
   }),
 };
@@ -117,7 +117,7 @@ const AddressCard = ({
           </p>
         </div>
       </div>
-      
+
       <div className="flex flex-col gap-2 ml-2">
         <button
           onClick={(e) => {
@@ -143,7 +143,7 @@ const AddressCard = ({
         )}
       </div>
     </div>
-    
+
     {selected && (
       <div className="absolute top-4 right-4 w-6 h-6 bg-(--color-brand-primary) text-white rounded-full flex items-center justify-center">
         <CheckCircle size={16} />
@@ -356,7 +356,7 @@ const Checkout = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [orderId, setOrderId] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
-  
+
   // Address Management
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedShippingAddress, setSelectedShippingAddress] = useState(null);
@@ -365,16 +365,16 @@ const Checkout = () => {
   const [showNewBillingForm, setShowNewBillingForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
   const [addressesLoading, setAddressesLoading] = useState(false);
-  
+
   // Shipping
   const [shippingMethods, setShippingMethods] = useState([]);
   const [selectedShippingMethod, setSelectedShippingMethod] = useState("");
   const [loadingShipping, setLoadingShipping] = useState(false);
-  
+
   // Form Errors
   const [formErrors, setFormErrors] = useState({});
   const [authError, setAuthError] = useState("");
-  
+
   // Location Data
   const [stateOptions, setStateOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
@@ -428,13 +428,13 @@ const Checkout = () => {
   // Fetch Saved Addresses
   const fetchSavedAddresses = useCallback(async () => {
     if (!isAuthenticated) return;
-    
+
     setAddressesLoading(true);
     try {
       const { data } = await axios.get(`${baseUrl}/address`, {
         withCredentials: true,
       });
-      
+
       if (data.success) {
         setSavedAddresses(data.data || []);
         // Auto-select default address if exists
@@ -496,7 +496,7 @@ const Checkout = () => {
 
   const validateBillingForm = () => {
     if (sameAsShipping) return true;
-    
+
     const errors = {};
     const { billing } = formData;
 
@@ -591,18 +591,14 @@ const Checkout = () => {
       const result = hasAccount
         ? await login({ email: formData.shipping.email, password: formData.shipping.password })
         : await register({
-            name: formData.shipping.fullName || formData.shipping.email.split("@")[0],
-            email: formData.shipping.email,
-            password: formData.shipping.password,
-          });
+          name: formData.shipping.fullName || formData.shipping.email.split("@")[0],
+          email: formData.shipping.email,
+          password: formData.shipping.password,
+        });
 
       if (result?.success) {
-        // Merge guest cart if exists
-        const { mergeGuestCart, guestCart } = useCartStore.getState();
-        if (guestCart?.length > 0) {
-          await mergeGuestCart();
-        }
-        // Refresh addresses after login
+        // authStore.login/register already calls mergeGuestCart + initializeCart
+        // Refresh addresses after login/register
         await fetchSavedAddresses();
       } else {
         setAuthError(storeError || result?.error?.message || "Authentication failed");
@@ -642,7 +638,7 @@ const Checkout = () => {
   const handleSaveAddress = async (type, isEdit = false) => {
     const isShipping = type === "shipping";
     const data = isShipping ? formData.shipping : formData.billing;
-    
+
     const payload = {
       fullName: data.fullName,
       phone: data.phone,
@@ -660,9 +656,9 @@ const Checkout = () => {
       const endpoint = isEdit && editingAddress
         ? `${baseUrl}/address/${editingAddress.id}`
         : `${baseUrl}/address/create`;
-      
+
       const method = isEdit ? "put" : "post";
-      
+
       const { data: response } = await axios[method](endpoint, payload, {
         withCredentials: true,
       });
@@ -672,7 +668,7 @@ const Checkout = () => {
         setShowNewShippingForm(false);
         setShowNewBillingForm(false);
         setEditingAddress(null);
-        
+
         if (isShipping) {
           setSelectedShippingAddress(response.data.id);
           return response.data.id;
@@ -691,13 +687,13 @@ const Checkout = () => {
 
   const handleDeleteAddress = async (addressId) => {
     if (!confirm("Are you sure you want to delete this address?")) return;
-    
+
     try {
       await axios.delete(`${baseUrl}/address/${addressId}`, {
         withCredentials: true,
       });
       await fetchSavedAddresses();
-      
+
       // Reset selection if deleted address was selected
       if (selectedShippingAddress === addressId) setSelectedShippingAddress(null);
       if (selectedBillingAddress === addressId) setSelectedBillingAddress(null);
@@ -716,7 +712,7 @@ const Checkout = () => {
         setCityOptions(City.getCitiesOfState(address.country, address.state));
       }
     }
-    
+
     setFormData((prev) => ({
       ...prev,
       shipping: {
@@ -764,7 +760,7 @@ const Checkout = () => {
 
     // Fetch shipping methods
     await fetchShippingMethods(shippingAddressId);
-    
+
     setStep(2);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -857,7 +853,7 @@ const Checkout = () => {
           <h3 className="text-lg font-semibold mb-4 text-(--text-heading)">
             {hasAccount ? "Welcome Back" : "Create Account"}
           </h3>
-          
+
           {authError && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertCircle size={20} className="text-red-600 mt-0.5 shrink-0" />
@@ -940,7 +936,7 @@ const Checkout = () => {
               >
                 {hasAccount ? "Don't have an account? Register" : "Already have an account? Login"}
               </button>
-              
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -1043,7 +1039,7 @@ const Checkout = () => {
                   <h3 className="text-lg font-semibold text-(--text-heading)">
                     {editingAddress ? "Edit Address" : "New Shipping Address"}
                   </h3>
-                  
+
                   <AddressForm
                     data={formData.shipping}
                     onChange={(field, value) => handleShippingChange(field, value)}
@@ -1102,7 +1098,7 @@ const Checkout = () => {
                   <h3 className="text-lg font-semibold text-(--text-heading)">
                     Billing Address
                   </h3>
-                  
+
                   {/* Billing Address Selection */}
                   {savedAddresses.length > 0 && !showNewBillingForm && (
                     <div className="grid gap-3 mb-4">
@@ -1369,7 +1365,7 @@ const Checkout = () => {
                 <Shield size={20} className="text-green-600" />
                 <span className="text-sm text-green-700 font-medium">Secure SSL Encryption</span>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-(--text-heading) mb-2">
                   Card Number *
@@ -1478,11 +1474,11 @@ const Checkout = () => {
         <h1 className="text-3xl md:text-4xl font-bold mb-4 text-(--text-heading)">
           Order Confirmed!
         </h1>
-        
+
         <p className="text-(--text-secondary) text-lg mb-2">
           Thank you for your purchase
         </p>
-        
+
         <p className="text-(--text-secondary) mb-8">
           Order #
           <span className="font-semibold text-(--text-heading)">
@@ -1495,37 +1491,37 @@ const Checkout = () => {
             <Package size={20} />
             Order Summary
           </h3>
-          
+
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-(--text-secondary)">Subtotal</span>
               <span className="font-semibold">{formatPrice(orderDetails?.subtotal)}</span>
             </div>
-            
+
             {orderDetails?.promotionSavings > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Promotions</span>
                 <span className="font-semibold">-{formatPrice(orderDetails.promotionSavings)}</span>
               </div>
             )}
-            
+
             {orderDetails?.discountAmount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Coupon Discount</span>
                 <span className="font-semibold">-{formatPrice(orderDetails.discountAmount)}</span>
               </div>
             )}
-            
+
             <div className="flex justify-between">
               <span className="text-(--text-secondary)">Shipping</span>
               <span className="font-semibold">{formatPrice(orderDetails?.shippingAmount)}</span>
             </div>
-            
+
             <div className="flex justify-between">
               <span className="text-(--text-secondary)">Tax</span>
               <span className="font-semibold">{formatPrice(orderDetails?.taxAmount)}</span>
             </div>
-            
+
             <div className="border-t pt-3 flex justify-between font-bold text-lg">
               <span>Total</span>
               <span>{formatPrice(orderDetails?.total)}</span>

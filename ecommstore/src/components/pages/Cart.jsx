@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import useCartStore from "@/store/useCartStore";
-import useAuthStore from "@/store/authStore";
 import Loader from "../ui/Loader";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion"; // Optional but recommendeds
@@ -105,10 +104,8 @@ const Cart = () => {
     recentlyRemovedCoupon,
   } = useCartStore();
 
-  const { user } = useAuthStore();
-
-  const cartItems = getCartItems(user);
-  const cartSummary = getCartSummary(user);
+  const cartItems = getCartItems();
+  const cartSummary = getCartSummary();
 
   // Refs for focus management
   const promoInputRef = useRef(null);
@@ -550,10 +547,10 @@ const Cart = () => {
                             onKeyDown={handlePromoKeyDown}
                             placeholder="Enter promo code (e.g., SAVE10)"
                             className={`w-full px-4 py-3 text-sm sm:text-base border-2 rounded-lg focus:outline-none transition-all ${promoError
-                              ? "border-red-300 focus:border-red-500 bg-red-50"
-                              : isValidating
-                                ? "border-blue-300 bg-blue-50"
-                                : "border-gray-200 focus:border-blue-500 bg-white"
+                                ? "border-red-300 focus:border-red-500 bg-red-50"
+                                : isValidating
+                                  ? "border-blue-300 bg-blue-50"
+                                  : "border-gray-200 focus:border-blue-500 bg-white"
                               }`}
                             aria-invalid={!!promoError}
                             aria-describedby={promoError ? "promo-error" : undefined}

@@ -30,7 +30,7 @@ const useAuthStore = create(
           const cartStore = useCartStore.getState();
 
           await cartStore.mergeGuestCart(data.user);
-          await cartStore.initializeCart(data.user);
+          await cartStore.initializeCart();
 
           return { success: true };
         } catch (err) {
@@ -64,7 +64,7 @@ const useAuthStore = create(
           const cartStore = useCartStore.getState();
 
           await cartStore.mergeGuestCart(data.user);
-          await cartStore.initializeCart(data.user);
+          await cartStore.initializeCart();
 
           return { success: true };
         } catch (err) {

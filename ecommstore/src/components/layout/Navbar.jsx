@@ -42,9 +42,9 @@ const Navbar = () => {
   const searchRef = useRef(null);
 
   const { getCartItems, getCartSummary } = useCartStore();
-  const { itemCount, subtotal } = getCartSummary(user);
+  const { itemCount, subtotal } = getCartSummary();
 
-  const cartItems = getCartItems(user);
+  const cartItems = getCartItems();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -365,7 +365,7 @@ const Navbar = () => {
                 <button
                   onClick={() => {
                     setIsCartOpen(!isCartOpen);
-                    getCartItems(user);
+                    getCartItems();
                   }}
                   className="flex items-center border gap-2 sm:gap-3 md:border lg:border text-black px-3 sm:px-4 py-2 rounded-full hover:bg-(--btn-bg-hover) transition-all group"
                 >

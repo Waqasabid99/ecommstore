@@ -1,20 +1,18 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ShoppingCart, X, Plus, Minus, Trash2 } from "lucide-react";
 import useCartStore from "@/store/useCartStore";
-import useAuthStore from "@/store/authStore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Loader from "./Loader";
 import Image from "next/image";
-import { ShoppingCart } from "lucide-react";
 
 const FloatingCart = () => {
-  const { user } = useAuthStore();
   const { getCartItems, getCartSummary, updateCartItem, removeCartItem } =
     useCartStore();
-  const { totalQuantity, subtotal } = getCartSummary(user);
-  const cartItems = getCartItems(user);
+  const { totalQuantity, subtotal } = getCartSummary();
+  const cartItems = getCartItems();
   const [isLoading, setIsLoading] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const router = useRouter();

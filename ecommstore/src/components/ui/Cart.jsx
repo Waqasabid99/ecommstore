@@ -1,14 +1,12 @@
 import { baseUrl } from "@/lib/utils";
 import useCartStore from "@/store/useCartStore";
-import useAuthStore from "@/store/authStore";
 import Image from "next/image";
 import Link from "next/link";
 
 const Cart = () => {
-  const { user } = useAuthStore();
   const { getCartItems, getCartSummary, updateCartItem, removeCartItem } = useCartStore();
-  const { itemCount, totalQuantity, subtotal } = getCartSummary(user);
-  const cartItems = getCartItems(user);
+  const { itemCount, totalQuantity, subtotal } = getCartSummary();
+  const cartItems = getCartItems();
   console.log(cartItems)
   const updateQuantity = (itemId, currentQty, delta) => {
     const newQty = currentQty + delta;

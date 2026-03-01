@@ -387,8 +387,8 @@ const Checkout = () => {
   const { login, register, error: storeError, clearError } = useAuthStore();
 
   // Derived Data
-  const orderItems = useMemo(() => getCartItems(user), [getCartItems, items, guestCart, user]);
-  const { subtotal, discountAmount, promotionSavings, taxAmount, total, shippingAmount } = getCartSummary(user);
+  const orderItems = useMemo(() => getCartItems(), [getCartItems, items, guestCart]);
+  const { subtotal, discountAmount, promotionSavings, taxAmount, total, shippingAmount } = getCartSummary();
 
   const countryOptions = useMemo(
     () =>
@@ -466,8 +466,9 @@ const Checkout = () => {
           email: user.email || prev.shipping.email,
         },
       }));
+      initializeCart();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, initializeCart]);
 
   // Clear errors on unmount
   useEffect(() => {
@@ -596,8 +597,12 @@ const Checkout = () => {
         });
 
       if (result?.success) {
-        // authStore.login/register already calls mergeGuestCart + initializeCart
-        // Refresh addresses after login/register
+        // Merge guest cart if exists
+        const { mergeGuestCart, guestCart } = useCartStore.getState();
+        if (guestCart?.length > 0) {
+          await mergeGuestCart();
+        }
+        // Refresh addresses after login
         await fetchSavedAddresses();
       } else {
         setAuthError(storeError || result?.error?.message || "Authentication failed");

@@ -20,27 +20,25 @@ const useCartStore = create(
       // COMPUTED VALUES
       // =====================
 
-      getCartItems: (userOverride) => {
+      getCartItems: () => {
         const state = get();
         const user =
-          userOverride !== undefined ? userOverride :
-            (typeof window !== "undefined"
-              ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
-              : null);
+          typeof window !== "undefined"
+            ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
+              ?.user
+            : null;
 
         return user ? state.items : state.guestCart;
       },
 
-      getCartSummary: (userOverride) => {
+      getCartSummary: () => {
         const state = get();
-        const items = get().getCartItems(userOverride);
+        const items = get().getCartItems();
         const user =
-          userOverride !== undefined ? userOverride :
-            (typeof window !== "undefined"
-              ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
-                ?.user
-              : null);
+          typeof window !== "undefined"
+            ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
+              ?.user
+            : null;
 
         if (user && state.summary) {
           return state.summary;
@@ -72,13 +70,12 @@ const useCartStore = create(
       // INITIALIZE CART
       // =====================
 
-      initializeCart: async (userOverride) => {
+      initializeCart: async () => {
         const user =
-          userOverride ??
-          (typeof window !== "undefined"
+          typeof window !== "undefined"
             ? JSON.parse(localStorage.getItem("auth-storage") || "{}")?.state
               ?.user
-            : null);
+            : null;
 
         if (!user) {
           set({ cart: null, items: [], summary: null });

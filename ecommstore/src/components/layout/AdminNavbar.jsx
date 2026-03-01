@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import {
   ShoppingCart,
-  Heart,
   User,
   Menu,
   X,
@@ -73,14 +72,6 @@ const AdminNavbar = () => {
             {/* Action Buttons */}
             {isUserPage && (
               <div className="flex items-center gap-2 sm:gap-4">
-                {/* Wishlist */}
-                <button
-                  className="hidden sm:flex p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
-                  aria-label="Wishlist"
-                >
-                  <Heart size={24} />
-                </button>
-
                 {/* Cart */}
                 {isAdminPage ? null : (
                 <div className="relative">

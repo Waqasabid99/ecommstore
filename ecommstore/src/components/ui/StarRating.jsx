@@ -18,7 +18,7 @@ export default function StarRating({
   showValue = false,
   className = "",
   fillColor = "#FFD700",
-  emptyColor = "#e5e7eb",
+  emptyColor = "",
   strokeColor = "#FFD700",
   gap = 6,
   tooltips = [],

@@ -261,7 +261,7 @@ const Orders = ({ revenue }) => {
           },
           {
             label: "Total Revenue",
-            value: `$${revenueData?.total || 0}`,
+            value: `$${revenueData?.revenue?.total || 0}`,
             icon: <DollarSign size={32} />,
           },
         ]}

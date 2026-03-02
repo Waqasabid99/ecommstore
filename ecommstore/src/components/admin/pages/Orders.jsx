@@ -83,12 +83,12 @@ const Orders = ({ revenue }) => {
         axios.get(`${baseUrl}/dashboard/stats`, { withCredentials: true }),
       ])
       console.log(orderRes, statsRes)
-      if (orderRes.success) {
-        setOrders(orderRes.data.data);
+      if (orderRes?.data?.success && statsRes?.data?.success) {
+        setOrders(orderRes?.data?.data || []);
         setPagination((prev) => ({
           ...prev,
-          total: orderRes.data.pagination.total,
-          totalPages: orderRes.data.pagination.totalPages,
+          total: orderRes?.data?.pagination?.total,
+          totalPages: orderRes?.data?.pagination?.totalPages,
         }));
         setRevenueData(statsRes.data.data);
         const pendingCount = orderRes.data.data.filter((o) => o.status === "PENDING").length;

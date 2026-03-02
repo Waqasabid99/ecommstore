@@ -623,7 +623,7 @@ const ShippingMethods = () => {
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-black text-white rounded font-semibold p-3 border border-transparent hover:bg-gray-800 flex items-center gap-2"
+              className="bg-white text-black rounded font-semibold p-3 border border-transparent hover:bg-gray-800 flex items-center gap-2"
             >
               <Plus size={16} />
               Add Rate

@@ -26,6 +26,8 @@ const ViewOrder = () => {
   const [order, setOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
   const { orderId } = useParams();
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -162,6 +164,32 @@ const ViewOrder = () => {
 
   const statusConfig = getStatusConfig(order.status);
   const StatusIcon = statusConfig.icon;
+
+  const handleDownloadInvoice = async () => {
+    if (!orderId || invoiceLoading) return;
+
+    try {
+      setInvoiceLoading(true);
+      setInvoiceError("");
+
+      const { data } = await axios.get(`${baseUrl}/invoices/order/${orderId}`, {
+        withCredentials: true,
+      });
+
+      if (data?.success && data?.data?.pdfUrl) {
+        window.open(data.data.pdfUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      setInvoiceError("Invoice is not available right now. Please try again.");
+    } catch (err) {
+      setInvoiceError(
+        err?.response?.data?.error || "Failed to download invoice. Please try again."
+      );
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
@@ -493,10 +521,17 @@ const ViewOrder = () => {
                     Track Order
                   </button>
                     )}
-                  <button className="w-full border-2 border-(--border-inverse) text-(--text-primary) px-6 py-3 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium flex items-center justify-center gap-2">
+                  <button
+                    onClick={handleDownloadInvoice}
+                    disabled={invoiceLoading}
+                    className="w-full border-2 border-(--border-inverse) text-(--text-primary) px-6 py-3 rounded-full hover:bg-(--bg-inverse) hover:text-(--text-inverse) transition-all font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
                     <Download size={18} />
-                    Download Invoice
+                    {invoiceLoading ? "Preparing Invoice..." : "Download Invoice"}
                   </button>
+                  {invoiceError && (
+                    <p className="text-sm text-red-600">{invoiceError}</p>
+                  )}
                 </div>
 
               </div>

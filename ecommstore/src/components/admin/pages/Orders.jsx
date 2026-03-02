@@ -56,6 +56,7 @@ const Orders = ({ revenue }) => {
     maxAmount: "",
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [revenueData, setRevenueData] = useState();
   const { adminID } = useParams();
   const navigate = useRouter();
 
@@ -77,30 +78,31 @@ const Orders = ({ revenue }) => {
         ...(filters.maxAmount && { maxAmount: filters.maxAmount }),
       });
 
-      const { data } = await axios.get(`${baseUrl}/orders`, {
-        withCredentials: true,
-      });
-
-      if (data.success) {
-        setOrders(data.data);
+      const [orderRes, statsRes]  = await Promise.all([
+        axios.get(`${baseUrl}/orders`, { withCredentials: true }),
+        axios.get(`${baseUrl}/dashboard/stats`, { withCredentials: true }),
+      ])
+      console.log(orderRes, statsRes)
+      if (orderRes.success) {
+        setOrders(orderRes.data.data);
         setPagination((prev) => ({
           ...prev,
-          total: data.pagination.total,
-          totalPages: data.pagination.totalPages,
+          total: orderRes.data.pagination.total,
+          totalPages: orderRes.data.pagination.totalPages,
         }));
-
-        const pendingCount = data.data.filter((o) => o.status === "PENDING").length;
-        const paidCount = data.data.filter((o) => o.status === "PAID").length;
-        const deliveredCount = data.data.filter(
+        setRevenueData(statsRes.data.data);
+        const pendingCount = orderRes.data.data.filter((o) => o.status === "PENDING").length;
+        const paidCount = orderRes.data.data.filter((o) => o.status === "PAID").length;
+        const deliveredCount = orderRes.data.data.filter(
           (o) => o.status === "DELIVERED"
         ).length;
 
         setStats({
-          total: data.pagination.total,
+          total: orderRes.data.pagination.total,
           pending: pendingCount,
           paid: paidCount,
           delivered: deliveredCount,
-          // totalRevenue,
+          totalRevenue: statsRes.data.revenue,
         });
       }
     } catch (error) {
@@ -259,7 +261,7 @@ const Orders = ({ revenue }) => {
           },
           {
             label: "Total Revenue",
-            value: `$${revenue.total}`,
+            value: `$${revenueData?.total || 0}`,
             icon: <DollarSign size={32} />,
           },
         ]}

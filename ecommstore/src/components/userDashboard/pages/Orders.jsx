@@ -45,7 +45,7 @@ const Orders = () => {
     return (
       <section>
         <DashboardHeadingBox text="Orders" subHeading={"View all your orders"} />
-        <div className="flex items-center justify-center min-h-75">
+        <div className="flex items-center justify-center min-h-64">
           <div className="text-center">
             <LoaderIcon size={48} className="animate-spin mx-auto mb-4 text-black" />
             <p className="text-gray-600">Loading orders...</p>

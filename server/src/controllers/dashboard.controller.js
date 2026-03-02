@@ -101,6 +101,13 @@ const getStatsOverview = async (req, res) => {
           status: { in: ["PENDING", "AWAITING_PAYMENT"] },
           deletedAt: null,
         },
+      }); 
+
+      const totalOrders = await tx.order.count({
+        where: {
+          createdAt: { gte: start, lte: end },
+          deletedAt: null,
+        },
       });
 
       // 6. Inventory alerts
@@ -140,6 +147,7 @@ const getStatsOverview = async (req, res) => {
         orders: {
           pending: pendingOrders,
           completed: revenueStats._count.id,
+          totalOrders,
         },
         inventory: {
           lowStock: lowStockCount,

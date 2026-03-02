@@ -140,7 +140,7 @@ console.log(orders, stats)
         stats={[
           {
             label: "Total Users",
-            value: stats?.customers?.total || 0,
+            value: stats?.customers?.totalUsers || 0,
             icon: <Users size={32} />,
           },
           {

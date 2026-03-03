@@ -4,9 +4,9 @@ import { useRouter } from "next/router";
 const AdminProtector = ({children}) => {
     const { user, isAuthenticated } = useAuthStore();
     const router = useRouter();
-    // If not authenticated or not an admin, render nothing (or you could redirect)
+    // If not authenticated or not an admin, redirect to home page
     if (!isAuthenticated || user?.role !== 'admin') {
-        router.push('/login'); // Redirect to login if not admin
+        router.push('/');
         return null;
     }
   return (

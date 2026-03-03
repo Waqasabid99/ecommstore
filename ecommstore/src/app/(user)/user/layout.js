@@ -4,6 +4,7 @@ import FloatingCart from "@/components/ui/FloatingCart";
 import { Skeleton } from "@/components/ui/SidebarSkeleton";
 import CheckAuth from "@/lib/AuthCheck";
 import CartInitializer from "@/lib/CartInitializer";
+import UserProtector from "@/lib/UserProtector";
 import { Suspense } from "react";
 
 export const metadata = {
@@ -15,6 +16,7 @@ export const metadata = {
 export default async function UserLayout({ children }) {
   return (
     <div className="min-h-screen bg-(--bg-page)">
+      <UserProtector>
       <CheckAuth>
         <CartInitializer>
           <AdminNavbar />
@@ -30,6 +32,7 @@ export default async function UserLayout({ children }) {
           </main>
         </CartInitializer>
       </CheckAuth>
+      </UserProtector>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import AdminNavbar from "@/components/layout/AdminNavbar";
 import Sidebar from "@/components/layout/Sidebar";
+import AdminProtector from "@/lib/AdminProtector";
 import CheckAuth from "@/lib/AuthCheck";
 
 export const metadata = {
@@ -12,6 +13,7 @@ export default async function AdminLayout({ children }) {
 
   return (
    <div className="min-h-screen bg-(--bg-page)">
+    <AdminProtector>
     <CheckAuth>
     <AdminNavbar />
       <Sidebar />
@@ -22,6 +24,7 @@ export default async function AdminLayout({ children }) {
         </div>
       </main>
     </CheckAuth>
+    </AdminProtector>
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { useRouter } from "next/router";
+import useAuthStore from "@/store/authStore";
+import { useRouter } from "next/navigation";
 
 const UserProtector = ({children}) => {
     const { user, isAuthenticated } = useAuthStore();

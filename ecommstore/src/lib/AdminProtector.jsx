@@ -1,5 +1,5 @@
 import useAuthStore from "@/store/authStore"
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 
 const AdminProtector = ({children}) => {
     const { user, isAuthenticated } = useAuthStore();

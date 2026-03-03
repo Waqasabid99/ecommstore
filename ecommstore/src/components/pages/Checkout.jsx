@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   CreditCard,
   Truck,
@@ -24,7 +24,6 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import axios from "axios";
 import { baseUrl } from "@/lib/utils";
-import Loader from "../ui/Loader";
 
 const Checkout = () => {
   const [step, setStep] = useState(1);
@@ -44,6 +43,12 @@ const Checkout = () => {
   const [selectedShippingMethod, setSelectedShippingMethod] = useState("STANDARD");
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+  const [shippingAddressMode, setShippingAddressMode] = useState("new");
+  const [selectedSavedShippingAddressId, setSelectedSavedShippingAddressId] = useState("");
+  const [billingAddressMode, setBillingAddressMode] = useState("new");
+  const [selectedSavedBillingAddressId, setSelectedSavedBillingAddressId] = useState("");
 
   const { getCartItems, getCartSummary, initializeCart } = useCartStore();
   const { isAuthenticated, user } = useAuth();
@@ -131,6 +136,105 @@ const Checkout = () => {
     });
   }, [shippingInfo.email, shippingInfo.password]);
 
+  const applyAddressToShippingForm = (address) => {
+    if (!address) return;
+    setShippingInfo((prev) => ({
+      ...prev,
+      fullName: address.fullName || prev.fullName,
+      phone: address.phone || "",
+      line1: address.line1 || "",
+      line2: address.line2 || "",
+      city: address.city || "",
+      country: address.country || "",
+      state: address.state || "",
+      postalCode: address.postalCode || "",
+    }));
+    setStateOptions(State.getStatesOfCountry(address.country || ""));
+    if (address.country && address.state) {
+      setCityOptions(City.getCitiesOfState(address.country, address.state));
+    }
+  };
+
+  const applyAddressToBillingForm = (address) => {
+    if (!address) return;
+    setBillingInfo((prev) => ({
+      ...prev,
+      fullName: address.fullName || "",
+      phone: address.phone || "",
+      line1: address.line1 || "",
+      line2: address.line2 || "",
+      city: address.city || "",
+      country: address.country || "",
+      state: address.state || "",
+      postalCode: address.postalCode || "",
+    }));
+  };
+
+  const upsertAddressInList = (address) => {
+    if (!address) return;
+    setSavedAddresses((prev) => {
+      const withoutCurrent = prev.filter((item) => item.id !== address.id);
+      if (!address.isDefault) return [address, ...withoutCurrent];
+      return [address, ...withoutCurrent.map((item) => ({ ...item, isDefault: false }))];
+    });
+  };
+
+  const fetchSavedAddresses = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoadingAddresses(true);
+    try {
+      const { data } = await axios.get(`${baseUrl}/address/`, { withCredentials: true });
+      const addresses = data?.data || [];
+      setSavedAddresses(addresses);
+
+      if (addresses.length > 0) {
+        const defaultAddress = addresses.find((address) => address.isDefault) || addresses[0];
+        setShippingAddressMode("saved");
+        setSelectedSavedShippingAddressId(defaultAddress.id);
+        setSelectedSavedBillingAddressId(defaultAddress.id);
+        setBillingAddressMode("saved");
+      } else {
+        setShippingAddressMode("new");
+        setBillingAddressMode("new");
+        setSelectedSavedShippingAddressId("");
+        setSelectedSavedBillingAddressId("");
+      }
+    } catch (error) {
+      console.error("Failed to fetch addresses", error);
+      setSavedAddresses([]);
+      setShippingAddressMode("new");
+      setBillingAddressMode("new");
+      setSelectedSavedShippingAddressId("");
+      setSelectedSavedBillingAddressId("");
+    } finally {
+      setLoadingAddresses(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setSavedAddresses([]);
+      setShippingAddressMode("new");
+      setBillingAddressMode("new");
+      setSelectedSavedShippingAddressId("");
+      setSelectedSavedBillingAddressId("");
+      return;
+    }
+    fetchSavedAddresses();
+  }, [isAuthenticated, fetchSavedAddresses]);
+
+  useEffect(() => {
+    if (shippingAddressMode !== "saved" || !selectedSavedShippingAddressId) return;
+    const address = savedAddresses.find((item) => item.id === selectedSavedShippingAddressId);
+    applyAddressToShippingForm(address);
+  }, [shippingAddressMode, selectedSavedShippingAddressId, savedAddresses]);
+
+  useEffect(() => {
+    if (billingAddressMode !== "saved" || !selectedSavedBillingAddressId) return;
+    const address = savedAddresses.find((item) => item.id === selectedSavedBillingAddressId);
+    applyAddressToBillingForm(address);
+  }, [billingAddressMode, selectedSavedBillingAddressId, savedAddresses]);
+
   const handleShippingChange = (e) => {
     const { name, value } = e.target;
     setShippingInfo((prev) => ({ ...prev, [name]: value }));
@@ -212,93 +316,117 @@ const Checkout = () => {
       return;
     }
 
-    if (
-      !shippingInfo.fullName ||
-      !shippingInfo.phone ||
-      !shippingInfo.line1 ||
-      !shippingInfo.city ||
-      !shippingInfo.country ||
-      !shippingInfo.state
-    ) {
-      setAuthError("Please fill in all required shipping details");
-      return;
-    }
-
-    if (!sameAsShipping) {
-      if (
-        !billingInfo.fullName ||
-        !billingInfo.line1 ||
-        !billingInfo.city ||
-        !billingInfo.phone ||
-        !billingInfo.country ||
-        !billingInfo.state
-      ) {
-        setAuthError("Please fill in all required billing details");
-        return;
-      }
-    }
-
     try {
       setIsLoading(true);
+      let resolvedShippingAddressId = null;
+      let resolvedBillingAddressId = null;
+      const hasSavedAddresses = savedAddresses.length > 0;
 
-      // Create shipping address
-      const shippingAddressData = {
-        fullName: shippingInfo.fullName,
-        phone: shippingInfo.phone,
-        line1: shippingInfo.line1,
-        line2: shippingInfo.line2 || null,
-        city: shippingInfo.city,
-        state: shippingInfo.state,
-        country: shippingInfo.country,
-        postalCode: shippingInfo.postalCode || null,
-        isDefault: sameAsShipping,
-      };
-
-      const { data: shippingData } = await axios.post(
-        `${baseUrl}/address/create`,
-        shippingAddressData,
-        { withCredentials: true }
-      );
-
-      if (!shippingData.success) {
-        setAuthError(shippingData.error || "Failed to save shipping address");
-        setIsLoading(false);
-        return;
-      }
-
-      setShippingAddressId(shippingData.data.id);
-
-      // Fetch available shipping methods
-      await fetchShippingMethods(shippingData.data.id);
-
-      // Create billing address if different
-      if (!sameAsShipping) {
-        const billingAddressData = {
-          fullName: billingInfo.fullName,
-          phone: billingInfo.phone,
-          line1: billingInfo.line1,
-          line2: billingInfo.line2 || null,
-          city: billingInfo.city,
-          state: billingInfo.state,
-          country: billingInfo.country,
-          postalCode: billingInfo.postalCode || null,
-          isDefault: false,
-        };
-
-        const { data: billingData } = await axios.post(
-          `${baseUrl}/address/create`,
-          billingAddressData,
-          { withCredentials: true }
-        );
-
-        if (!billingData.success) {
-          setAuthError(billingData.error || "Failed to save billing address");
+      if (hasSavedAddresses && shippingAddressMode === "saved") {
+        if (!selectedSavedShippingAddressId) {
+          setAuthError("Please select a shipping address");
+          setIsLoading(false);
+          return;
+        }
+        resolvedShippingAddressId = selectedSavedShippingAddressId;
+      } else {
+        if (
+          !shippingInfo.fullName ||
+          !shippingInfo.phone ||
+          !shippingInfo.line1 ||
+          !shippingInfo.city ||
+          !shippingInfo.country ||
+          !shippingInfo.state ||
+          !shippingInfo.postalCode
+        ) {
+          setAuthError("Please fill in all required shipping details");
           setIsLoading(false);
           return;
         }
 
-        setBillingAddressId(billingData.data.id);
+        const shippingAddressData = {
+          fullName: shippingInfo.fullName,
+          phone: shippingInfo.phone,
+          line1: shippingInfo.line1,
+          line2: shippingInfo.line2 || null,
+          city: shippingInfo.city,
+          state: shippingInfo.state,
+          country: shippingInfo.country,
+          postalCode: shippingInfo.postalCode,
+          isDefault: savedAddresses.length === 0,
+        };
+
+        const { data: shippingData } = await axios.post(
+          `${baseUrl}/address/create`,
+          shippingAddressData,
+          { withCredentials: true }
+        );
+
+        if (!shippingData.success) {
+          setAuthError(shippingData.error || "Failed to save shipping address");
+          setIsLoading(false);
+          return;
+        }
+        resolvedShippingAddressId = shippingData.data.id;
+        upsertAddressInList(shippingData.data);
       }
+
+      if (!sameAsShipping) {
+        if (hasSavedAddresses && billingAddressMode === "saved") {
+          if (!selectedSavedBillingAddressId) {
+            setAuthError("Please select a billing address");
+            setIsLoading(false);
+            return;
+          }
+          resolvedBillingAddressId = selectedSavedBillingAddressId;
+        } else {
+          if (
+            !billingInfo.fullName ||
+            !billingInfo.line1 ||
+            !billingInfo.city ||
+            !billingInfo.phone ||
+            !billingInfo.country ||
+            !billingInfo.state ||
+            !billingInfo.postalCode
+          ) {
+            setAuthError("Please fill in all required billing details");
+            setIsLoading(false);
+            return;
+          }
+
+          const billingAddressData = {
+            fullName: billingInfo.fullName,
+            phone: billingInfo.phone,
+            line1: billingInfo.line1,
+            line2: billingInfo.line2 || null,
+            city: billingInfo.city,
+            state: billingInfo.state,
+            country: billingInfo.country,
+            postalCode: billingInfo.postalCode,
+            isDefault: false,
+          };
+
+          const { data: billingData } = await axios.post(
+            `${baseUrl}/address/create`,
+            billingAddressData,
+            { withCredentials: true }
+          );
+
+          if (!billingData.success) {
+            setAuthError(billingData.error || "Failed to save billing address");
+            setIsLoading(false);
+            return;
+          }
+          resolvedBillingAddressId = billingData.data.id;
+          upsertAddressInList(billingData.data);
+        }
+      }
+
+      setShippingAddressId(resolvedShippingAddressId);
+      setBillingAddressId(resolvedBillingAddressId);
+
+      // Fetch available shipping methods
+      await fetchShippingMethods(resolvedShippingAddressId);
 
       setAuthError("");
       setStep(2);
@@ -775,387 +903,521 @@ const Checkout = () => {
                           Shipping Details
                         </h3>
 
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Full Name *
-                            </label>
-                            <input
-                              name="fullName"
-                              value={shippingInfo.fullName}
-                              onChange={handleShippingChange}
-                              required
-                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                              placeholder="John Doe"
-                            />
+                        {loadingAddresses ? (
+                          <div className="mb-4 flex items-center gap-2 text-(--text-secondary)">
+                            <Loader2 size={18} className="animate-spin" />
+                            <span>Loading saved addresses...</span>
                           </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Phone Number *
-                            </label>
-                            <PhoneInput
-                              containerStyle={{ width: "100%" }}
-                              inputStyle={{
-                                width: "100%",
-                                height: "48px",
-                                fontSize: "16px",
-                              }}
-                              country="us"
-                              value={shippingInfo.phone}
-                              onChange={(phone) =>
-                                handleShippingChange({
-                                  target: { name: "phone", value: phone },
-                                })
-                              }
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Address Line 1 *
-                            </label>
-                            <input
-                              name="line1"
-                              value={shippingInfo.line1}
-                              onChange={handleShippingChange}
-                              required
-                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                              placeholder="123 Main Street"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Address Line 2
-                            </label>
-                            <input
-                              name="line2"
-                              value={shippingInfo.line2}
-                              onChange={handleShippingChange}
-                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                              placeholder="Apartment, suite, etc."
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Country *
-                            </label>
-                            <Select
-                              isClearable
-                              isSearchable
-                              options={countryOptions}
-                              value={countryOptions.find(
-                                (opt) => opt.value === shippingInfo.country
-                              )}
-                              onChange={(option) => {
-                                setShippingInfo((prev) => ({
-                                  ...prev,
-                                  country: option?.value || "",
-                                  state: "",
-                                  city: "",
-                                }));
-                                setStateOptions(
-                                  State.getStatesOfCountry(option?.value || "")
-                                );
-                                setCityOptions([]);
-                              }}
-                              placeholder="Select Country"
-                              className="react-select-container"
-                              classNamePrefix="react-select"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              State / Province *
-                            </label>
-                            <Select
-                              isClearable
-                              isSearchable
-                              options={states}
-                              value={states.find(
-                                (opt) => opt.value === shippingInfo.state
-                              )}
-                              onChange={(option) => {
-                                setShippingInfo((prev) => ({
-                                  ...prev,
-                                  state: option?.value || "",
-                                  city: "",
-                                }));
-                                if (option?.value) {
-                                  setCityOptions(
-                                    City.getCitiesOfState(
-                                      shippingInfo.country,
-                                      option.value
-                                    )
-                                  );
-                                }
-                              }}
-                              placeholder="Select State"
-                              className="react-select-container"
-                              classNamePrefix="react-select"
-                              isDisabled={!shippingInfo.country}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              City *
-                            </label>
-                            <Select
-                              isClearable
-                              isSearchable
-                              options={cities}
-                              value={cities.find(
-                                (opt) => opt.value === shippingInfo.city
-                              )}
-                              onChange={(option) =>
-                                setShippingInfo((prev) => ({
-                                  ...prev,
-                                  city: option?.value || "",
-                                }))
-                              }
-                              placeholder="Select City"
-                              className="react-select-container"
-                              classNamePrefix="react-select"
-                              isDisabled={!shippingInfo.state}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                              Postal Code
-                            </label>
-                            <input
-                              type="text"
-                              name="postalCode"
-                              value={shippingInfo.postalCode}
-                              onChange={handleShippingChange}
-                              className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                              placeholder="12345"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Billing Address Toggle */}
-                        <div className="flex items-center gap-2 pt-4">
-                          <input
-                            type="checkbox"
-                            id="sameAsShipping"
-                            checked={sameAsShipping}
-                            onChange={(e) => setSameAsShipping(e.target.checked)}
-                            className="w-4 h-4 text-(--color-brand-primary) border-gray-300 rounded focus:ring-(--color-brand-primary)"
-                          />
-                          <label
-                            htmlFor="sameAsShipping"
-                            className="text-sm font-medium text-(--text-heading) cursor-pointer"
-                          >
-                            Billing address is same as shipping
-                          </label>
-                        </div>
-
-                        {/* Billing Details - Show if different from shipping */}
-                        {!sameAsShipping && (
+                        ) : (
                           <>
-                            <h3 className="text-lg font-semibold mb-4 text-(--text-heading) pt-4 border-t">
-                              Billing Details
-                            </h3>
+                            {savedAddresses.length > 0 && (
+                              <div className="space-y-4 mb-2">
+                                <div className="flex flex-wrap gap-3">
+                                  <label className="flex items-center gap-2">
+                                    <input
+                                      type="radio"
+                                      name="shippingAddressMode"
+                                      value="saved"
+                                      checked={shippingAddressMode === "saved"}
+                                      onChange={() => setShippingAddressMode("saved")}
+                                    />
+                                    <span className="text-sm font-medium text-(--text-heading)">
+                                      Use saved address
+                                    </span>
+                                  </label>
+                                  <label className="flex items-center gap-2">
+                                    <input
+                                      type="radio"
+                                      name="shippingAddressMode"
+                                      value="new"
+                                      checked={shippingAddressMode === "new"}
+                                      onChange={() => setShippingAddressMode("new")}
+                                    />
+                                    <span className="text-sm font-medium text-(--text-heading)">
+                                      Add new address
+                                    </span>
+                                  </label>
+                                </div>
 
-                            <div className="grid md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Full Name *
-                                </label>
-                                <input
-                                  name="fullName"
-                                  value={billingInfo.fullName}
-                                  onChange={handleBillingChange}
-                                  required
-                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                                  placeholder="John Doe"
-                                />
+                                {shippingAddressMode === "saved" && (
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      Saved Shipping Address *
+                                    </label>
+                                    <select
+                                      value={selectedSavedShippingAddressId}
+                                      onChange={(e) =>
+                                        setSelectedSavedShippingAddressId(e.target.value)
+                                      }
+                                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors bg-white"
+                                    >
+                                      <option value="">Select a saved address</option>
+                                      {savedAddresses.map((address) => (
+                                        <option key={address.id} value={address.id}>
+                                          {address.fullName} - {address.line1}, {address.city},{" "}
+                                          {address.country}
+                                          {address.isDefault ? " (Default)" : ""}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
                               </div>
+                            )}
 
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Phone Number *
-                                </label>
-                                <PhoneInput
-                                  containerStyle={{ width: "100%" }}
-                                  inputStyle={{
-                                    width: "100%",
-                                    height: "48px",
-                                    fontSize: "16px",
-                                  }}
-                                  country="us"
-                                  value={billingInfo.phone}
-                                  onChange={(phone) =>
-                                    handleBillingChange({
-                                      target: { name: "phone", value: phone },
-                                    })
-                                  }
-                                  required
-                                />
+                            {savedAddresses.length === 0 && (
+                              <div className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-sm text-blue-700">
+                                No saved addresses found. Please add a new address to continue.
                               </div>
-                            </div>
+                            )}
 
-                            <div className="grid md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Address Line 1 *
-                                </label>
-                                <input
-                                  name="line1"
-                                  value={billingInfo.line1}
-                                  onChange={handleBillingChange}
-                                  required
-                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                                  placeholder="123 Main Street"
-                                />
-                              </div>
+                            {(shippingAddressMode === "new" || savedAddresses.length === 0) && (
+                              <>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      Full Name *
+                                    </label>
+                                    <input
+                                      name="fullName"
+                                      value={shippingInfo.fullName}
+                                      onChange={handleShippingChange}
+                                      required
+                                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                      placeholder="John Doe"
+                                    />
+                                  </div>
 
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Address Line 2
-                                </label>
-                                <input
-                                  name="line2"
-                                  value={billingInfo.line2}
-                                  onChange={handleBillingChange}
-                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                                  placeholder="Apartment, suite, etc."
-                                />
-                              </div>
-                            </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      Phone Number *
+                                    </label>
+                                    <PhoneInput
+                                      containerStyle={{ width: "100%" }}
+                                      inputStyle={{
+                                        width: "100%",
+                                        height: "48px",
+                                        fontSize: "16px",
+                                      }}
+                                      country="us"
+                                      value={shippingInfo.phone}
+                                      onChange={(phone) =>
+                                        handleShippingChange({
+                                          target: { name: "phone", value: phone },
+                                        })
+                                      }
+                                      required
+                                    />
+                                  </div>
+                                </div>
 
-                            <div className="grid md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Country *
-                                </label>
-                                <Select
-                                  isClearable
-                                  isSearchable
-                                  options={countryOptions}
-                                  value={countryOptions.find(
-                                    (opt) => opt.value === billingInfo.country
-                                  )}
-                                  onChange={(option) => {
-                                    setBillingInfo((prev) => ({
-                                      ...prev,
-                                      country: option?.value || "",
-                                      state: "",
-                                      city: "",
-                                    }));
-                                  }}
-                                  placeholder="Select Country"
-                                  className="react-select-container"
-                                  classNamePrefix="react-select"
-                                />
-                              </div>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      Address Line 1 *
+                                    </label>
+                                    <input
+                                      name="line1"
+                                      value={shippingInfo.line1}
+                                      onChange={handleShippingChange}
+                                      required
+                                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                      placeholder="123 Main Street"
+                                    />
+                                  </div>
 
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  State / Province *
-                                </label>
-                                <Select
-                                  isClearable
-                                  isSearchable
-                                  options={State.getStatesOfCountry(
-                                    billingInfo.country
-                                  ).map((s) => ({
-                                    value: s.isoCode,
-                                    label: s.name,
-                                  }))}
-                                  value={
-                                    billingInfo.state
-                                      ? {
-                                          value: billingInfo.state,
-                                          label:
-                                            State.getStateByCodeAndCountry(
-                                              billingInfo.state,
-                                              billingInfo.country
-                                            )?.name || billingInfo.state,
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      Address Line 2
+                                    </label>
+                                    <input
+                                      name="line2"
+                                      value={shippingInfo.line2}
+                                      onChange={handleShippingChange}
+                                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                      placeholder="Apartment, suite, etc."
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      Country *
+                                    </label>
+                                    <Select
+                                      isClearable
+                                      isSearchable
+                                      options={countryOptions}
+                                      value={countryOptions.find(
+                                        (opt) => opt.value === shippingInfo.country
+                                      )}
+                                      onChange={(option) => {
+                                        setShippingInfo((prev) => ({
+                                          ...prev,
+                                          country: option?.value || "",
+                                          state: "",
+                                          city: "",
+                                        }));
+                                        setStateOptions(
+                                          State.getStatesOfCountry(option?.value || "")
+                                        );
+                                        setCityOptions([]);
+                                      }}
+                                      placeholder="Select Country"
+                                      className="react-select-container"
+                                      classNamePrefix="react-select"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      State / Province *
+                                    </label>
+                                    <Select
+                                      isClearable
+                                      isSearchable
+                                      options={states}
+                                      value={states.find(
+                                        (opt) => opt.value === shippingInfo.state
+                                      )}
+                                      onChange={(option) => {
+                                        setShippingInfo((prev) => ({
+                                          ...prev,
+                                          state: option?.value || "",
+                                          city: "",
+                                        }));
+                                        if (option?.value) {
+                                          setCityOptions(
+                                            City.getCitiesOfState(
+                                              shippingInfo.country,
+                                              option.value
+                                            )
+                                          );
                                         }
-                                      : null
-                                  }
-                                  onChange={(option) =>
-                                    setBillingInfo((prev) => ({
-                                      ...prev,
-                                      state: option?.value || "",
-                                      city: "",
-                                    }))
-                                  }
-                                  placeholder="Select State"
-                                  className="react-select-container"
-                                  classNamePrefix="react-select"
-                                  isDisabled={!billingInfo.country}
-                                />
-                              </div>
+                                      }}
+                                      placeholder="Select State"
+                                      className="react-select-container"
+                                      classNamePrefix="react-select"
+                                      isDisabled={!shippingInfo.country}
+                                    />
+                                  </div>
 
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  City *
-                                </label>
-                                <Select
-                                  isClearable
-                                  isSearchable
-                                  options={City.getCitiesOfState(
-                                    billingInfo.country,
-                                    billingInfo.state
-                                  ).map((c) => ({
-                                    value: c.name,
-                                    label: c.name,
-                                  }))}
-                                  value={
-                                    billingInfo.city
-                                      ? {
-                                          value: billingInfo.city,
-                                          label: billingInfo.city,
-                                        }
-                                      : null
-                                  }
-                                  onChange={(option) =>
-                                    setBillingInfo((prev) => ({
-                                      ...prev,
-                                      city: option?.value || "",
-                                    }))
-                                  }
-                                  placeholder="Select City"
-                                  className="react-select-container"
-                                  classNamePrefix="react-select"
-                                  isDisabled={!billingInfo.state}
-                                />
-                              </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      City *
+                                    </label>
+                                    <Select
+                                      isClearable
+                                      isSearchable
+                                      options={cities}
+                                      value={cities.find(
+                                        (opt) => opt.value === shippingInfo.city
+                                      )}
+                                      onChange={(option) =>
+                                        setShippingInfo((prev) => ({
+                                          ...prev,
+                                          city: option?.value || "",
+                                        }))
+                                      }
+                                      placeholder="Select City"
+                                      className="react-select-container"
+                                      classNamePrefix="react-select"
+                                      isDisabled={!shippingInfo.state}
+                                    />
+                                  </div>
 
-                              <div>
-                                <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                  Postal Code
-                                </label>
-                                <input
-                                  type="text"
-                                  name="postalCode"
-                                  value={billingInfo.postalCode}
-                                  onChange={handleBillingChange}
-                                  className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
-                                  placeholder="12345"
-                                />
-                              </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                      Postal Code *
+                                    </label>
+                                    <input
+                                      type="text"
+                                      name="postalCode"
+                                      value={shippingInfo.postalCode}
+                                      onChange={handleShippingChange}
+                                      required
+                                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                      placeholder="12345"
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            )}
+
+                            {/* Billing Address Toggle */}
+                            <div className="flex items-center gap-2 pt-4">
+                              <input
+                                type="checkbox"
+                                id="sameAsShipping"
+                                checked={sameAsShipping}
+                                onChange={(e) => setSameAsShipping(e.target.checked)}
+                                className="w-4 h-4 text-(--color-brand-primary) border-gray-300 rounded focus:ring-(--color-brand-primary)"
+                              />
+                              <label
+                                htmlFor="sameAsShipping"
+                                className="text-sm font-medium text-(--text-heading) cursor-pointer"
+                              >
+                                Billing address is same as shipping
+                              </label>
                             </div>
+
+                            {!sameAsShipping && (
+                              <>
+                                <h3 className="text-lg font-semibold mb-4 text-(--text-heading) pt-4 border-t">
+                                  Billing Details
+                                </h3>
+
+                                {savedAddresses.length > 0 && (
+                                  <div className="space-y-4 mb-2">
+                                    <div className="flex flex-wrap gap-3">
+                                      <label className="flex items-center gap-2">
+                                        <input
+                                          type="radio"
+                                          name="billingAddressMode"
+                                          value="saved"
+                                          checked={billingAddressMode === "saved"}
+                                          onChange={() => setBillingAddressMode("saved")}
+                                        />
+                                        <span className="text-sm font-medium text-(--text-heading)">
+                                          Use saved address
+                                        </span>
+                                      </label>
+                                      <label className="flex items-center gap-2">
+                                        <input
+                                          type="radio"
+                                          name="billingAddressMode"
+                                          value="new"
+                                          checked={billingAddressMode === "new"}
+                                          onChange={() => setBillingAddressMode("new")}
+                                        />
+                                        <span className="text-sm font-medium text-(--text-heading)">
+                                          Add new address
+                                        </span>
+                                      </label>
+                                    </div>
+
+                                    {billingAddressMode === "saved" && (
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          Saved Billing Address *
+                                        </label>
+                                        <select
+                                          value={selectedSavedBillingAddressId}
+                                          onChange={(e) =>
+                                            setSelectedSavedBillingAddressId(e.target.value)
+                                          }
+                                          className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors bg-white"
+                                        >
+                                          <option value="">Select a saved address</option>
+                                          {savedAddresses.map((address) => (
+                                            <option key={address.id} value={address.id}>
+                                              {address.fullName} - {address.line1}, {address.city},{" "}
+                                              {address.country}
+                                              {address.isDefault ? " (Default)" : ""}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {(billingAddressMode === "new" || savedAddresses.length === 0) && (
+                                  <>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          Full Name *
+                                        </label>
+                                        <input
+                                          name="fullName"
+                                          value={billingInfo.fullName}
+                                          onChange={handleBillingChange}
+                                          required
+                                          className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                          placeholder="John Doe"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          Phone Number *
+                                        </label>
+                                        <PhoneInput
+                                          containerStyle={{ width: "100%" }}
+                                          inputStyle={{
+                                            width: "100%",
+                                            height: "48px",
+                                            fontSize: "16px",
+                                          }}
+                                          country="us"
+                                          value={billingInfo.phone}
+                                          onChange={(phone) =>
+                                            handleBillingChange({
+                                              target: { name: "phone", value: phone },
+                                            })
+                                          }
+                                          required
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          Address Line 1 *
+                                        </label>
+                                        <input
+                                          name="line1"
+                                          value={billingInfo.line1}
+                                          onChange={handleBillingChange}
+                                          required
+                                          className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                          placeholder="123 Main Street"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          Address Line 2
+                                        </label>
+                                        <input
+                                          name="line2"
+                                          value={billingInfo.line2}
+                                          onChange={handleBillingChange}
+                                          className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                          placeholder="Apartment, suite, etc."
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          Country *
+                                        </label>
+                                        <Select
+                                          isClearable
+                                          isSearchable
+                                          options={countryOptions}
+                                          value={countryOptions.find(
+                                            (opt) => opt.value === billingInfo.country
+                                          )}
+                                          onChange={(option) => {
+                                            setBillingInfo((prev) => ({
+                                              ...prev,
+                                              country: option?.value || "",
+                                              state: "",
+                                              city: "",
+                                            }));
+                                          }}
+                                          placeholder="Select Country"
+                                          className="react-select-container"
+                                          classNamePrefix="react-select"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          State / Province *
+                                        </label>
+                                        <Select
+                                          isClearable
+                                          isSearchable
+                                          options={State.getStatesOfCountry(
+                                            billingInfo.country
+                                          ).map((s) => ({
+                                            value: s.isoCode,
+                                            label: s.name,
+                                          }))}
+                                          value={
+                                            billingInfo.state
+                                              ? {
+                                                  value: billingInfo.state,
+                                                  label:
+                                                    State.getStateByCodeAndCountry(
+                                                      billingInfo.state,
+                                                      billingInfo.country
+                                                    )?.name || billingInfo.state,
+                                                }
+                                              : null
+                                          }
+                                          onChange={(option) =>
+                                            setBillingInfo((prev) => ({
+                                              ...prev,
+                                              state: option?.value || "",
+                                              city: "",
+                                            }))
+                                          }
+                                          placeholder="Select State"
+                                          className="react-select-container"
+                                          classNamePrefix="react-select"
+                                          isDisabled={!billingInfo.country}
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          City *
+                                        </label>
+                                        <Select
+                                          isClearable
+                                          isSearchable
+                                          options={City.getCitiesOfState(
+                                            billingInfo.country,
+                                            billingInfo.state
+                                          ).map((c) => ({
+                                            value: c.name,
+                                            label: c.name,
+                                          }))}
+                                          value={
+                                            billingInfo.city
+                                              ? {
+                                                  value: billingInfo.city,
+                                                  label: billingInfo.city,
+                                                }
+                                              : null
+                                          }
+                                          onChange={(option) =>
+                                            setBillingInfo((prev) => ({
+                                              ...prev,
+                                              city: option?.value || "",
+                                            }))
+                                          }
+                                          placeholder="Select City"
+                                          className="react-select-container"
+                                          classNamePrefix="react-select"
+                                          isDisabled={!billingInfo.state}
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
+                                          Postal Code *
+                                        </label>
+                                        <input
+                                          type="text"
+                                          name="postalCode"
+                                          value={billingInfo.postalCode}
+                                          onChange={handleBillingChange}
+                                          required
+                                          className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors"
+                                          placeholder="12345"
+                                        />
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </>
+                            )}
                           </>
                         )}
 
                         {/* Continue Button */}
                         <button
                           type="submit"
-                          disabled={isLoading}
+                          disabled={isLoading || loadingAddresses}
                           className="w-full mt-6 bg-(--btn-bg-primary) text-(--btn-text-primary) px-6 py-4 rounded-full hover:bg-(--btn-bg-hover) transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                           {isLoading ? (

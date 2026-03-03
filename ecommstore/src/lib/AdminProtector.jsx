@@ -6,7 +6,7 @@ const AdminProtector = ({children}) => {
     const { user, isAuthenticated } = useAuthStore();
     const router = useRouter();
     // If not authenticated or not an admin, redirect to home page
-    if (!isAuthenticated || user?.role !== 'admin') {
+    if (!isAuthenticated || user?.role !== 'ADMIN') {
         router.push('/');
         return null;
     }

@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   AlertCircle,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 import { Country, State, City } from "country-state-city";
@@ -177,6 +178,20 @@ const Checkout = () => {
       if (!address.isDefault) return [address, ...withoutCurrent];
       return [address, ...withoutCurrent.map((item) => ({ ...item, isDefault: false }))];
     });
+  };
+
+  const formatAddressPreview = (address) => {
+    if (!address) return "";
+    return [
+      address.line1,
+      address.line2,
+      address.city,
+      address.state,
+      address.postalCode,
+      address.country,
+    ]
+      .filter(Boolean)
+      .join(", ");
   };
 
   const fetchSavedAddresses = useCallback(async () => {
@@ -912,54 +927,86 @@ const Checkout = () => {
                           <>
                             {savedAddresses.length > 0 && (
                               <div className="space-y-4 mb-2">
-                                <div className="flex flex-wrap gap-3">
-                                  <label className="flex items-center gap-2">
-                                    <input
-                                      type="radio"
-                                      name="shippingAddressMode"
-                                      value="saved"
-                                      checked={shippingAddressMode === "saved"}
-                                      onChange={() => setShippingAddressMode("saved")}
-                                    />
-                                    <span className="text-sm font-medium text-(--text-heading)">
-                                      Use saved address
-                                    </span>
-                                  </label>
-                                  <label className="flex items-center gap-2">
-                                    <input
-                                      type="radio"
-                                      name="shippingAddressMode"
-                                      value="new"
-                                      checked={shippingAddressMode === "new"}
-                                      onChange={() => setShippingAddressMode("new")}
-                                    />
-                                    <span className="text-sm font-medium text-(--text-heading)">
-                                      Add new address
-                                    </span>
-                                  </label>
+                                <div className="inline-flex w-full rounded-xl border border-(--border-default) bg-(--bg-surface) p-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShippingAddressMode("saved")}
+                                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                                      shippingAddressMode === "saved"
+                                        ? "bg-white text-(--text-heading) shadow-sm"
+                                        : "text-(--text-secondary) hover:text-(--text-heading)"
+                                    }`}
+                                  >
+                                    Use Saved Address
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShippingAddressMode("new")}
+                                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                                      shippingAddressMode === "new"
+                                        ? "bg-white text-(--text-heading) shadow-sm"
+                                        : "text-(--text-secondary) hover:text-(--text-heading)"
+                                    }`}
+                                  >
+                                    Add New Address
+                                  </button>
                                 </div>
 
                                 {shippingAddressMode === "saved" && (
-                                  <div>
-                                    <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                      Saved Shipping Address *
-                                    </label>
-                                    <select
-                                      value={selectedSavedShippingAddressId}
-                                      onChange={(e) =>
-                                        setSelectedSavedShippingAddressId(e.target.value)
-                                      }
-                                      className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors bg-white"
-                                    >
-                                      <option value="">Select a saved address</option>
-                                      {savedAddresses.map((address) => (
-                                        <option key={address.id} value={address.id}>
-                                          {address.fullName} - {address.line1}, {address.city},{" "}
-                                          {address.country}
-                                          {address.isDefault ? " (Default)" : ""}
-                                        </option>
-                                      ))}
-                                    </select>
+                                  <div className="grid gap-3">
+                                    {savedAddresses.map((address) => {
+                                      const isSelected =
+                                        selectedSavedShippingAddressId === address.id;
+
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={address.id}
+                                          onClick={() =>
+                                            setSelectedSavedShippingAddressId(address.id)
+                                          }
+                                          className={`w-full rounded-xl border p-4 text-left transition-all ${
+                                            isSelected
+                                              ? "border-(--color-brand-primary) bg-blue-50 shadow-sm"
+                                              : "border-(--border-default) bg-white hover:border-(--color-brand-primary)"
+                                          }`}
+                                        >
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-3">
+                                              <div
+                                                className={`mt-0.5 rounded-full p-2 ${
+                                                  isSelected
+                                                    ? "bg-(--bg-primary)"
+                                                    : "bg-(--bg-surface)"
+                                                }`}
+                                              >
+                                                <MapPin
+                                                  size={16}
+                                                  className={
+                                                    isSelected
+                                                      ? "text-(--icon-inverse)"
+                                                      : "text-(--text-secondary)"
+                                                  }
+                                                />
+                                              </div>
+                                              <div>
+                                                <p className="font-semibold text-(--text-heading)">
+                                                  {address.fullName || "Saved Address"}
+                                                </p>
+                                                <p className="mt-1 text-sm text-(--text-secondary)">
+                                                  {formatAddressPreview(address)}
+                                                </p>
+                                              </div>
+                                            </div>
+                                            {address.isDefault && (
+                                              <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                                                Default
+                                              </span>
+                                            )}
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -1170,54 +1217,86 @@ const Checkout = () => {
 
                                 {savedAddresses.length > 0 && (
                                   <div className="space-y-4 mb-2">
-                                    <div className="flex flex-wrap gap-3">
-                                      <label className="flex items-center gap-2">
-                                        <input
-                                          type="radio"
-                                          name="billingAddressMode"
-                                          value="saved"
-                                          checked={billingAddressMode === "saved"}
-                                          onChange={() => setBillingAddressMode("saved")}
-                                        />
-                                        <span className="text-sm font-medium text-(--text-heading)">
-                                          Use saved address
-                                        </span>
-                                      </label>
-                                      <label className="flex items-center gap-2">
-                                        <input
-                                          type="radio"
-                                          name="billingAddressMode"
-                                          value="new"
-                                          checked={billingAddressMode === "new"}
-                                          onChange={() => setBillingAddressMode("new")}
-                                        />
-                                        <span className="text-sm font-medium text-(--text-heading)">
-                                          Add new address
-                                        </span>
-                                      </label>
+                                    <div className="inline-flex w-full rounded-xl border border-(--border-default) bg-(--bg-surface) p-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setBillingAddressMode("saved")}
+                                        className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                                          billingAddressMode === "saved"
+                                            ? "bg-white text-(--text-heading) shadow-sm"
+                                            : "text-(--text-secondary) hover:text-(--text-heading)"
+                                        }`}
+                                      >
+                                        Use Saved Address
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setBillingAddressMode("new")}
+                                        className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                                          billingAddressMode === "new"
+                                            ? "bg-white text-(--text-heading) shadow-sm"
+                                            : "text-(--text-secondary) hover:text-(--text-heading)"
+                                        }`}
+                                      >
+                                        Add New Address
+                                      </button>
                                     </div>
 
                                     {billingAddressMode === "saved" && (
-                                      <div>
-                                        <label className="block text-sm font-medium text-(--text-heading) mb-2">
-                                          Saved Billing Address *
-                                        </label>
-                                        <select
-                                          value={selectedSavedBillingAddressId}
-                                          onChange={(e) =>
-                                            setSelectedSavedBillingAddressId(e.target.value)
-                                          }
-                                          className="w-full px-4 py-3 border border-(--border-default) rounded-lg focus:outline-none focus:border-(--color-brand-primary) transition-colors bg-white"
-                                        >
-                                          <option value="">Select a saved address</option>
-                                          {savedAddresses.map((address) => (
-                                            <option key={address.id} value={address.id}>
-                                              {address.fullName} - {address.line1}, {address.city},{" "}
-                                              {address.country}
-                                              {address.isDefault ? " (Default)" : ""}
-                                            </option>
-                                          ))}
-                                        </select>
+                                      <div className="grid gap-3">
+                                        {savedAddresses.map((address) => {
+                                          const isSelected =
+                                            selectedSavedBillingAddressId === address.id;
+
+                                          return (
+                                            <button
+                                              type="button"
+                                              key={address.id}
+                                              onClick={() =>
+                                                setSelectedSavedBillingAddressId(address.id)
+                                              }
+                                              className={`w-full rounded-xl border p-4 text-left transition-all ${
+                                                isSelected
+                                                  ? "border-(--color-brand-primary) bg-blue-50 shadow-sm"
+                                                  : "border-(--border-default) bg-white hover:border-(--color-brand-primary)"
+                                              }`}
+                                            >
+                                              <div className="flex items-start justify-between gap-3">
+                                                <div className="flex items-start gap-3">
+                                                  <div
+                                                    className={`mt-0.5 rounded-full p-2 ${
+                                                      isSelected
+                                                        ? "bg-(--bg-primary)"
+                                                        : "bg-(--bg-surface)"
+                                                    }`}
+                                                  >
+                                                    <MapPin
+                                                      size={16}
+                                                      className={
+                                                        isSelected
+                                                          ? "text-(--icon-inverse)"
+                                                          : "text-(--text-secondary)"
+                                                      }
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <p className="font-semibold text-(--text-heading)">
+                                                      {address.fullName || "Saved Address"}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-(--text-secondary)">
+                                                      {formatAddressPreview(address)}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                                {address.isDefault && (
+                                                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                                                    Default
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </button>
+                                          );
+                                        })}
                                       </div>
                                     )}
                                   </div>

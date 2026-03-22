@@ -38,9 +38,14 @@ app.use(cookieParser());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.set("trust proxy", 1);
+
 app.get("/", (req, res) => {
     res.send("Backend is running");
 });
+app.get("/health", (req, res) => {
+    res.json({ success: true, message: "All systems operational" });
+)}
+
 app.use("/auth", authRouter);
 app.use("/users", userRouter);
 app.use("/address", addressRouter);

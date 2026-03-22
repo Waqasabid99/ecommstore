@@ -42,9 +42,10 @@ app.set("trust proxy", 1);
 app.get("/", (req, res) => {
     res.send("Backend is running");
 });
+
 app.get("/health", (req, res) => {
-    res.json({ success: true, message: "All systems operational" });
-)}
+  res.json({ success: true, message: "All systems operational" });
+});
 
 app.use("/auth", authRouter);
 app.use("/users", userRouter);
